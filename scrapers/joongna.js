@@ -22,6 +22,7 @@ function normalize(raw) {
     price: Number.isFinite(price) ? price : null,
     url: `https://web.joongna.com/product/${id}`,
     image: img,
+    date: pick(raw, ["sortDate", "regDate"]),
   };
 }
 

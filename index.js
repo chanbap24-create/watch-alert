@@ -10,6 +10,7 @@ import { scrapeViver } from "./scrapers/viver.js";
 import { scrapeKangkas } from "./scrapers/kangkas.js";
 import { scrapeFeelway } from "./scrapers/feelway.js";
 import { scrapeTimeforum } from "./scrapers/timeforum.js";
+import { isFresh } from "./lib/freshness.js";
 
 const config = JSON.parse(await readFile(new URL("./config.json", import.meta.url), "utf8"));
 
@@ -70,6 +71,13 @@ async function main() {
     console.log(`[타임포럼] 매칭: ${items.length}건`);
     found.push(...items);
   }
+
+  // 오래된(사실상 죽은) 매물 제거 — maxAgeDays 이내만. 날짜 불명 사이트는 유지.
+  const before = found.length;
+  const fresh = found.filter((i) => isFresh(i, config.maxAgeDays));
+  if (config.maxAgeDays) console.log(`최근 ${config.maxAgeDays}일 필터: ${before} → ${fresh.length}건`);
+  found.length = 0;
+  found.push(...fresh);
 
   let newCount = 0;
   for (const item of found) {

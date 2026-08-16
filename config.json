@@ -2,6 +2,7 @@
   "keywords": [
     "브레게 마린"
   ],
+  "maxAgeDays": 30,
   "sites": {
     "joongna": {
       "enabled": true

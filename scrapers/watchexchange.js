@@ -62,6 +62,7 @@ function normalize(item) {
     price: Number(item.sellPrice) || null,
     url: `https://pc.watchexchange.co.kr/personal-product-detail/${item.id}`,
     image: item.mainImage?.filePath ? S3 + item.mainImage.filePath : undefined,
+    date: item.createdAt || item.inBoundDate || undefined,
   };
 }
 

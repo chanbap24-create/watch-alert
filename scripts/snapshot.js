@@ -9,6 +9,7 @@ import { scrapeKangkas } from "../scrapers/kangkas.js";
 import { scrapeFeelway } from "../scrapers/feelway.js";
 import { scrapeTimeforum } from "../scrapers/timeforum.js";
 import { scrapeWatchexchange } from "../scrapers/watchexchange.js";
+import { isFresh } from "../lib/freshness.js";
 
 const config = JSON.parse(await readFile(new URL("../config.json", import.meta.url), "utf8"));
 
@@ -32,13 +33,16 @@ await browser.close();
 if (config.sites.watchexchange?.enabled) items.push(...(await scrapeWatchexchange(config.keywords)));
 if (config.sites.timeforum?.enabled) items.push(...(await scrapeTimeforum(config.keywords)));
 
+const fresh = items.filter((i) => isFresh(i, config.maxAgeDays));
+console.log(`최근 ${config.maxAgeDays || "∞"}일 필터: ${items.length} → ${fresh.length}건`);
+
 const outDir = new URL("../public/", import.meta.url).pathname;
 await mkdir(outDir, { recursive: true });
 const snapshot = {
   updatedAt: new Date().toISOString(),
   keywords: config.keywords,
-  count: items.length,
-  items,
+  count: fresh.length,
+  items: fresh,
 };
 await writeFile(outDir + "snapshot.json", JSON.stringify(snapshot, null, 0), "utf8");
 console.log(`snapshot 저장: ${items.length}건 → public/snapshot.json`);

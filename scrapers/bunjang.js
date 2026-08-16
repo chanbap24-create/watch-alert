@@ -11,6 +11,7 @@ function normalize(p) {
     url: `https://m.bunjang.co.kr/products/${p.pid}`,
     image: p.product_image ? p.product_image.replace("{res}", "300") : undefined,
     location: p.location || undefined,
+    date: p.update_time || undefined, // 유닉스초
   };
 }
 

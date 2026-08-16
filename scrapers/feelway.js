@@ -20,6 +20,7 @@ function normalize(p) {
     price: Number(p.g_price) || null,
     url: `https://www.feelway.com/gv_${brand.replace(/\s+/g, "%20")}_${p.g_no}.html`,
     image: p.g_photo1 ? IMG_BASE + p.g_photo1 : p.g_photo ? IMG_BASE + p.g_photo : undefined,
+    date: p.created_at || undefined,
   };
 }
 

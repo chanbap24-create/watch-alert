@@ -12,6 +12,7 @@ function normalize(p) {
     price: Number(p.price) || null,
     url: `https://www.viver.co.kr/products/${p.id}`,
     image: p.representativeImageUrl || p.thumbnail || undefined,
+    date: p.startSaleAt || undefined,
   };
 }
 
