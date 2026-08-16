@@ -9,6 +9,7 @@ import { scrapeBunjang } from "./scrapers/bunjang.js";
 import { scrapeViver } from "./scrapers/viver.js";
 import { scrapeKangkas } from "./scrapers/kangkas.js";
 import { scrapeFeelway } from "./scrapers/feelway.js";
+import { scrapeTimeforum } from "./scrapers/timeforum.js";
 
 const config = JSON.parse(await readFile(new URL("./config.json", import.meta.url), "utf8"));
 
@@ -61,6 +62,12 @@ async function main() {
   if (config.sites.watchexchange?.enabled && config.keywords.length) {
     const items = await scrapeWatchexchange(config.keywords);
     console.log(`[시계거래소] 개인매물 매칭: ${items.length}건`);
+    found.push(...items);
+  }
+  // 타임포럼: 로그인 프로필로 회원장터 검색
+  if (config.sites.timeforum?.enabled && config.keywords.length) {
+    const items = await scrapeTimeforum(config.keywords);
+    console.log(`[타임포럼] 매칭: ${items.length}건`);
     found.push(...items);
   }
 

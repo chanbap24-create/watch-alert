@@ -18,6 +18,9 @@
     "feelway": {
       "enabled": true
     },
+    "timeforum": {
+      "enabled": true
+    },
     "watchexchange": {
       "enabled": true
     }
