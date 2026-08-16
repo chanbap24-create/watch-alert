@@ -1,5 +1,6 @@
 node_modules/
 data/seen.json
+data/seen.login.json
 data/*.state.json
 data/wx-chrome-profile/
 data/tf-chrome-profile/

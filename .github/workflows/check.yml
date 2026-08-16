@@ -1,14 +1,13 @@
 name: watch-check
 
-# 하루 3회(KST 09시/15시/21시 = UTC 0/6/12). GitHub Actions는 UTC 기준.
+# 하루 3회(KST 09/15/21시 = UTC 0/6/12). 로그인 불필요 6곳만 클라우드에서 검색.
 on:
   schedule:
     - cron: "0 0 * * *"
     - cron: "0 6 * * *"
     - cron: "0 12 * * *"
-  workflow_dispatch: {} # 수동 실행 버튼
+  workflow_dispatch: {}
 
-# seen.json을 커밋해 실행 간 상태를 유지하기 위한 권한
 permissions:
   contents: write
 
@@ -28,18 +27,20 @@ jobs:
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
+      # 중고나라(chromium) + 구구스(real chrome) 둘 다 설치
+      - run: npx playwright install --with-deps chromium chrome
 
-      - name: Run check
+      - name: Run check (cloud sites)
         env:
+          CONFIG: config.cloud.json
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: node index.js
 
-      - name: Persist seen list
+      - name: Persist seen + snapshot
         run: |
           git config user.name "watch-alert-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add -f data/seen.json
-          git commit -m "chore: update seen list [skip ci]" || echo "변경 없음"
+          git add -f data/seen.json docs/snapshot.json
+          git commit -m "chore: cloud check $(date -u '+%Y-%m-%d %H:%M')" || echo "변경 없음"
           git push || echo "push 생략"

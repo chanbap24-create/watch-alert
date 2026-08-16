@@ -19,7 +19,8 @@ import { scrapeTimeforum } from "./scrapers/timeforum.js";
 import { scrapeGugus } from "./scrapers/gugus.js";
 import { isFresh } from "./lib/freshness.js";
 
-const config = JSON.parse(await readFile(new URL("./config.json", import.meta.url), "utf8"));
+// CONFIG 환경변수로 설정파일 선택(클라우드=config.cloud.json / 맥=config.local.json)
+const config = JSON.parse(await readFile(new URL(`./${process.env.CONFIG || "config.json"}`, import.meta.url), "utf8"));
 
 async function main() {
   const seen = await loadSeen();
@@ -107,13 +108,16 @@ async function main() {
   await saveSeen(seen);
 
   // 대시보드용 스냅샷 저장(현재 매물 전체) — 웹에서 이 파일을 읽어 보여준다.
-  const outDir = new URL("./docs/", import.meta.url).pathname;
-  await mkdir(outDir, { recursive: true });
-  await writeFile(
-    outDir + "snapshot.json",
-    JSON.stringify({ updatedAt: new Date().toISOString(), keywords: config.keywords, count: found.length, items: found }),
-    "utf8"
-  );
+  // NO_SNAPSHOT=1 이면 건너뜀(맥 로그인전용 실행이 클라우드 스냅샷을 덮어쓰지 않도록)
+  if (!process.env.NO_SNAPSHOT) {
+    const outDir = new URL("./docs/", import.meta.url).pathname;
+    await mkdir(outDir, { recursive: true });
+    await writeFile(
+      outDir + "snapshot.json",
+      JSON.stringify({ updatedAt: new Date().toISOString(), keywords: config.keywords, count: found.length, items: found }),
+      "utf8"
+    );
+  }
 
   console.log(
     firstRun
