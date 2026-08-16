@@ -4,13 +4,29 @@
   ],
   "maxAgeDays": 30,
   "sites": {
-    "joongna": { "enabled": false },
-    "bunjang": { "enabled": false },
-    "viver": { "enabled": false },
-    "kangkas": { "enabled": false },
-    "feelway": { "enabled": false },
-    "gugus": { "enabled": false },
-    "watchexchange": { "enabled": true },
-    "timeforum": { "enabled": true }
+    "joongna": {
+      "enabled": false
+    },
+    "bunjang": {
+      "enabled": false
+    },
+    "viver": {
+      "enabled": false
+    },
+    "kangkas": {
+      "enabled": false
+    },
+    "feelway": {
+      "enabled": false
+    },
+    "gugus": {
+      "enabled": false
+    },
+    "watchexchange": {
+      "enabled": true
+    },
+    "timeforum": {
+      "enabled": true
+    }
   }
 }
