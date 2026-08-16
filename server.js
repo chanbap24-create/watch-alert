@@ -7,6 +7,8 @@ import { scrapeJoongna } from "./scrapers/joongna.js";
 import { scrapeWatchexchange } from "./scrapers/watchexchange.js";
 import { scrapeBunjang } from "./scrapers/bunjang.js";
 import { scrapeViver } from "./scrapers/viver.js";
+import { scrapeKangkas } from "./scrapers/kangkas.js";
+import { scrapeFeelway } from "./scrapers/feelway.js";
 
 const CONFIG = new URL("./config.json", import.meta.url).pathname;
 const PORT = 5178;
@@ -77,6 +79,20 @@ const server = createServer(async (req, res) => {
           items.push(...(await scrapeViver(keyword)));
         } catch (e) {
           console.warn("바이버 검색 실패:", e.message);
+        }
+      }
+      if (cfg.sites.kangkas?.enabled) {
+        try {
+          items.push(...(await scrapeKangkas(keyword)));
+        } catch (e) {
+          console.warn("캉카스 검색 실패:", e.message);
+        }
+      }
+      if (cfg.sites.feelway?.enabled) {
+        try {
+          items.push(...(await scrapeFeelway(keyword)));
+        } catch (e) {
+          console.warn("필웨이 검색 실패:", e.message);
         }
       }
       if (cfg.sites.watchexchange?.enabled) {

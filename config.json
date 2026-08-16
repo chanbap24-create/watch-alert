@@ -12,6 +12,12 @@
     "viver": {
       "enabled": true
     },
+    "kangkas": {
+      "enabled": true
+    },
+    "feelway": {
+      "enabled": true
+    },
     "watchexchange": {
       "enabled": true
     }

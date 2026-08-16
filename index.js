@@ -7,6 +7,8 @@ import { scrapeJoongna } from "./scrapers/joongna.js";
 import { scrapeWatchexchange } from "./scrapers/watchexchange.js";
 import { scrapeBunjang } from "./scrapers/bunjang.js";
 import { scrapeViver } from "./scrapers/viver.js";
+import { scrapeKangkas } from "./scrapers/kangkas.js";
+import { scrapeFeelway } from "./scrapers/feelway.js";
 
 const config = JSON.parse(await readFile(new URL("./config.json", import.meta.url), "utf8"));
 
@@ -38,6 +40,18 @@ async function main() {
     if (config.sites.viver?.enabled) {
       const items = await scrapeViver(keyword);
       console.log(`[바이버] '${keyword}': ${items.length}건`);
+      found.push(...items);
+    }
+    // 캉카스: 쇼핑몰 검색 HTML 파싱(브라우저 불필요)
+    if (config.sites.kangkas?.enabled) {
+      const items = await scrapeKangkas(keyword);
+      console.log(`[캉카스] '${keyword}': ${items.length}건`);
+      found.push(...items);
+    }
+    // 필웨이: 공개 API 직접 검색(브라우저 불필요)
+    if (config.sites.feelway?.enabled) {
+      const items = await scrapeFeelway(keyword);
+      console.log(`[필웨이] '${keyword}': ${items.length}건`);
       found.push(...items);
     }
   }
