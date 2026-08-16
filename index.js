@@ -16,6 +16,7 @@ import { scrapeViver } from "./scrapers/viver.js";
 import { scrapeKangkas } from "./scrapers/kangkas.js";
 import { scrapeFeelway } from "./scrapers/feelway.js";
 import { scrapeTimeforum } from "./scrapers/timeforum.js";
+import { scrapeGugus } from "./scrapers/gugus.js";
 import { isFresh } from "./lib/freshness.js";
 
 const config = JSON.parse(await readFile(new URL("./config.json", import.meta.url), "utf8"));
@@ -75,6 +76,12 @@ async function main() {
   if (config.sites.timeforum?.enabled && config.keywords.length) {
     const items = await scrapeTimeforum(config.keywords);
     console.log(`[타임포럼] 매칭: ${items.length}건`);
+    found.push(...items);
+  }
+  // 구구스: 브라우저로 브랜드 검색 → 시계 필터
+  if (config.sites.gugus?.enabled && config.keywords.length) {
+    const items = await scrapeGugus(config.keywords);
+    console.log(`[구구스] 매칭: ${items.length}건`);
     found.push(...items);
   }
 

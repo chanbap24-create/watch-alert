@@ -39,11 +39,13 @@ function parseRows(html, keyword, out, seen) {
     if (/완료/.test(text)) continue; // 거래완료 제외
     if (!tokenMatch(`${title} ${text}`, keyword)) continue;
     seen.add(srl);
+    // 목록 행의 가격(예: 19,000,000원) 추출
+    const priceM = text.match(/([0-9]{1,3}(?:,[0-9]{3})+)\s*원/);
     out.push({
       site: "타임포럼",
       id: `timeforum-${srl}`,
       title,
-      price: null, // 목록엔 가격 없음(본문 확인 필요)
+      price: priceM ? Number(priceM[1].replace(/,/g, "")) : null,
       url: `https://www.timeforum.co.kr/BuyMarket/${srl}`,
       image: undefined,
     });
@@ -61,11 +63,25 @@ export async function scrapeTimeforum(keywords) {
   const seen = new Set();
   try {
     const page = ctx.pages()[0] || (await ctx.newPage());
+
+    // 로그인 상태 확인 — 로그아웃 시 검색이 필터되지 않으므로 중단(잘못된 결과 방지)
+    await page.goto("https://www.timeforum.co.kr/", { waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
+    const loggedIn = await page.evaluate(() => (document.body?.innerText || "").includes("로그아웃"));
+    if (!loggedIn) {
+      console.warn("[타임포럼] 로그인 만료 — `npm run login:timeforum` 로 재로그인 필요(로그인 상태 유지 체크)");
+      return out;
+    }
+
     for (const kw of list) {
-      const url = `${BASE}&search_keyword=${encodeURIComponent(kw)}`;
-      await page.goto(url, { waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(800);
-      parseRows(await page.content(), kw, out, seen);
+      // 여러 페이지를 훑어 오래된 매물도 포함(판매중만 남음)
+      for (let p = 1; p <= 3; p++) {
+        const url = `${BASE}&search_keyword=${encodeURIComponent(kw)}&page=${p}`;
+        await page.goto(url, { waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(600);
+        const beforeCount = out.length;
+        parseRows(await page.content(), kw, out, seen);
+        if (out.length === beforeCount && p > 1) break; // 더 안 늘면 중단
+      }
     }
   } finally {
     await ctx.close();

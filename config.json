@@ -24,6 +24,9 @@
     },
     "watchexchange": {
       "enabled": true
+    },
+    "gugus": {
+      "enabled": true
     }
   }
 }
