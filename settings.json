@@ -1,12 +1,13 @@
 {
   "keywords": [
-    "브레게 마린"
+    "브레게 마린",
+    "브레게"
   ],
   "times": [
     "09:00",
     "15:00",
     "21:00"
   ],
-  "priceMin": 0,
-  "priceMax": 0
+  "priceMin": 1000,
+  "priceMax": 2900
 }
