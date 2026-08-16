@@ -36,7 +36,7 @@ if (config.sites.timeforum?.enabled) items.push(...(await scrapeTimeforum(config
 const fresh = items.filter((i) => isFresh(i, config.maxAgeDays));
 console.log(`최근 ${config.maxAgeDays || "∞"}일 필터: ${items.length} → ${fresh.length}건`);
 
-const outDir = new URL("../public/", import.meta.url).pathname;
+const outDir = new URL("../docs/", import.meta.url).pathname;
 await mkdir(outDir, { recursive: true });
 const snapshot = {
   updatedAt: new Date().toISOString(),
@@ -45,4 +45,4 @@ const snapshot = {
   items: fresh,
 };
 await writeFile(outDir + "snapshot.json", JSON.stringify(snapshot, null, 0), "utf8");
-console.log(`snapshot 저장: ${items.length}건 → public/snapshot.json`);
+console.log(`snapshot 저장: ${fresh.length}건 → docs/snapshot.json`);

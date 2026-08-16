@@ -39,13 +39,13 @@ const server = createServer(async (req, res) => {
 
   try {
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      const html = await readFile(new URL("./public/index.html", import.meta.url), "utf8");
+      const html = await readFile(new URL("./docs/index.html", import.meta.url), "utf8");
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       return res.end(html);
     }
     if (url.pathname === "/snapshot.json") {
       try {
-        const snap = await readFile(new URL("./public/snapshot.json", import.meta.url), "utf8");
+        const snap = await readFile(new URL("./docs/snapshot.json", import.meta.url), "utf8");
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
         return res.end(snap);
       } catch {

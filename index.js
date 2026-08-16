@@ -100,7 +100,7 @@ async function main() {
   await saveSeen(seen);
 
   // 대시보드용 스냅샷 저장(현재 매물 전체) — 웹에서 이 파일을 읽어 보여준다.
-  const outDir = new URL("./public/", import.meta.url).pathname;
+  const outDir = new URL("./docs/", import.meta.url).pathname;
   await mkdir(outDir, { recursive: true });
   await writeFile(
     outDir + "snapshot.json",
