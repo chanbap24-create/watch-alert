@@ -1,5 +1,11 @@
 // 진입점: 설정된 키워드로 각 사이트를 검색 → 처음 보는 매물만 알림.
+import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+
+// .env 자동 로드(텔레그램 토큰 등) — Node 20.6+ 내장
+const envPath = new URL("./.env", import.meta.url).pathname;
+if (existsSync(envPath)) process.loadEnvFile(envPath);
+
 import { chromium } from "playwright";
 import { loadSeen, saveSeen } from "./lib/store.js";
 import { notify } from "./lib/notify.js";
