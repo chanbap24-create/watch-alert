@@ -44,6 +44,11 @@
   .price .ask { font-weight:500; color:var(--sub); font-size:.82rem; }
   .price .age { font-weight:400; color:var(--sub); font-size:.74rem; }
   .empty { color:var(--sub); text-align:center; padding:60px 0; }
+  .section-h { font-size:.95rem; font-weight:700; margin:26px 2px 12px; padding-top:16px; border-top:1px solid var(--line); }
+  .section-h .sub { font-weight:500; color:var(--sub); font-size:.8rem; }
+  .price-inputs { display:flex; align-items:center; gap:6px; margin-bottom:14px; }
+  .price-inputs input { width:90px; font-size:16px; border:1px solid var(--line); border-radius:8px; padding:7px; }
+  .price-inputs span { color:var(--sub); font-size:.85rem; }
   /* 편집 패널 */
   .panel { display:none; border-top:1px solid var(--line); margin-top:10px; padding-top:12px; }
   .panel.open { display:block; }
@@ -76,6 +81,11 @@
         <input id="kwInput" placeholder="검색어 추가 (예: 롤렉스 서브마리너)">
         <button onclick="addKw()">추가</button>
       </div>
+      <h3>금액 범위 (만원 · 0 = 제한 없음)</h3>
+      <div class="price-inputs">
+        <input type="number" id="pMin" placeholder="최소" min="0"><span>만원 ~</span>
+        <input type="number" id="pMax" placeholder="최대" min="0"><span>만원</span>
+      </div>
       <h3>검색 시각 (하루 3회, 24시간제)</h3>
       <div class="times" id="timesEdit"></div>
       <div style="margin-top:12px"><button class="saveBtn" onclick="save()">💾 저장하고 적용</button>
@@ -86,10 +96,25 @@
 <main>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none">매물이 없습니다.</div>
+  <div id="askSection" style="display:none">
+    <div class="section-h">💬 가격문의 <span id="askCount" class="sub"></span></div>
+    <div class="grid" id="askGrid"></div>
+  </div>
 </main>
 <script>
   const SITE_ORDER = ["시계거래소","바이버","번개장터","중고나라","캉카스","필웨이","타임포럼","구구스"];
-  let all=[], site="전체", sort="new", kwActive=new Set(), settings={keywords:[],times:[]}, canEdit=false;
+  let all=[], site="전체", sort="new", kwActive=new Set(), settings={keywords:[],times:[],priceMin:0,priceMax:0}, canEdit=false;
+  const cardHtml = (i) => `
+    <a class="card" href="${i.url}" target="_blank" rel="noopener">
+      <div class="ph">
+        ${i.image?`<img loading="lazy" src="${i.image}" alt="" onerror="this.style.display='none'">`:""}
+        <span class="badge">${i.site}</span>
+        ${i.isNew?`<span class="new">🆕 NEW</span>`:""}
+      </div>
+      <div class="title">${i.title}</div>
+      ${i.keyword?`<div class="kwtag">🔍 ${i.keyword}</div>`:""}
+      <div class="price">${i.price?won(i.price):'<span class="ask">가격문의</span>'}${i.date?`<span class="age"> · ${ageLabel(i.date)}</span>`:""}</div>
+    </a>`;
   const won = (n) => n ? (n>=10000 ? Math.round(n/10000).toLocaleString()+"만원" : n.toLocaleString()+"원") : null;
   const toMs = (v) => v==null ? null : (typeof v==="number" ? (v<1e12?v*1000:v) : Date.parse(String(v).replace(" ","T"))||null);
   function ageLabel(v){ const ms=toMs(v); if(!ms) return ""; const d=Math.floor((Date.now()-ms)/86400000);
@@ -98,22 +123,24 @@
   function render() {
     let list = site==="전체" ? all : all.filter(i=>i.site===site);
     if (kwActive.size) list = list.filter(i => kwActive.has(i.keyword));
-    if (sort==="priceUp") list=[...list].sort((a,b)=>(a.price||1e15)-(b.price||1e15));
-    else if (sort==="priceDown") list=[...list].sort((a,b)=>(b.price||0)-(a.price||0));
-    else if (sort==="new") list=[...list].sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0) || (toMs(b.date)||0)-(toMs(a.date)||0));
-    else list=[...list].sort((a,b)=>SITE_ORDER.indexOf(a.site)-SITE_ORDER.indexOf(b.site));
-    document.getElementById("empty").style.display = list.length?"none":"block";
-    document.getElementById("grid").innerHTML = list.map(i=>`
-      <a class="card" href="${i.url}" target="_blank" rel="noopener">
-        <div class="ph">
-          ${i.image?`<img loading="lazy" src="${i.image}" alt="" onerror="this.style.display='none'">`:""}
-          <span class="badge">${i.site}</span>
-          ${i.isNew?`<span class="new">🆕 NEW</span>`:""}
-        </div>
-        <div class="title">${i.title}</div>
-        ${i.keyword?`<div class="kwtag">🔍 ${i.keyword}</div>`:""}
-        <div class="price">${i.price?won(i.price):'<span class="ask">가격문의</span>'}${i.date?`<span class="age"> · ${ageLabel(i.date)}</span>`:""}</div>
-      </a>`).join("");
+    // 가격문의(가격 없음)는 따로 분리
+    let priced = list.filter(i=>i.price);
+    const asks = list.filter(i=>!i.price);
+    // 금액 범위 필터(만원 → 원). max=0 이면 상한 없음
+    const min=(settings.priceMin||0)*10000, max=(settings.priceMax||0)*10000;
+    if (min>0 || max>0) priced = priced.filter(i=>i.price>=min && (max===0 || i.price<=max));
+
+    const sortFn = (arr)=>{
+      if (sort==="priceUp") return [...arr].sort((a,b)=>a.price-b.price);
+      if (sort==="priceDown") return [...arr].sort((a,b)=>b.price-a.price);
+      if (sort==="new") return [...arr].sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0) || (toMs(b.date)||0)-(toMs(a.date)||0));
+      return [...arr].sort((a,b)=>SITE_ORDER.indexOf(a.site)-SITE_ORDER.indexOf(b.site));
+    };
+    document.getElementById("empty").style.display = (priced.length||asks.length)?"none":"block";
+    document.getElementById("grid").innerHTML = sortFn(priced).map(cardHtml).join("");
+    document.getElementById("askSection").style.display = asks.length?"block":"none";
+    document.getElementById("askCount").textContent = asks.length?`${asks.length}건`:"";
+    document.getElementById("askGrid").innerHTML = sortFn(asks).map(cardHtml).join("");
   }
 
   function buildFilters() {
@@ -148,6 +175,10 @@
       `<span class="edit-chip">${k}<button onclick="delKw(${idx})">×</button></span>`).join("") || '<span class="savenote">검색어가 없습니다</span>';
     document.getElementById("timesEdit").innerHTML = (settings.times||[]).map((t,idx)=>
       `<input type="time" value="${t}" onchange="settings.times[${idx}]=this.value">`).join("");
+    document.getElementById("pMin").value = settings.priceMin||"";
+    document.getElementById("pMax").value = settings.priceMax||"";
+    document.getElementById("pMin").onchange = e=>settings.priceMin=Number(e.target.value)||0;
+    document.getElementById("pMax").onchange = e=>settings.priceMax=Number(e.target.value)||0;
   }
   function addKw(){ const v=document.getElementById("kwInput").value.trim(); if(!v)return;
     if(!settings.keywords.includes(v))settings.keywords.push(v); document.getElementById("kwInput").value=""; renderPanel(); }
@@ -164,16 +195,31 @@
   async function boot(){
     // 로컬 서버면 편집 가능
     try{ const s=await fetch("/api/settings"); if(s.ok){ settings=await s.json(); canEdit=true; document.getElementById("gear").style.display=""; } }catch{}
-    const r=await fetch("./snapshot.json?"+Date.now()); const d=await r.json();
+    // 클라우드(6곳) + 로컬(시계거래소·타임포럼) 스냅샷을 합침
+    const bust="?"+Date.now();
+    const [cloud, local] = await Promise.all([
+      fetch("./snapshot.json"+bust).then(r=>r.json()).catch(()=>({items:[]})),
+      fetch("./snapshot.local.json"+bust).then(r=>r.ok?r.json():{items:[]}).catch(()=>({items:[]})),
+    ]);
+    const d = {
+      ...cloud,
+      items: [...(cloud.items||[]), ...(local.items||[])],
+      sites: [...(cloud.sites||[]), ...(local.sites||[])],
+      updatedAt: cloud.updatedAt || local.updatedAt,
+    };
     all=d.items||[];
-    if(!canEdit){ settings={keywords:d.keywords||[],times:d.times||[]}; }
+    if(!canEdit){ settings={keywords:d.keywords||[],times:d.times||[],priceMin:d.priceMin||0,priceMax:d.priceMax||0}; }
     const t=new Date(d.updatedAt);
     const ago=t.toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
     document.getElementById("meta").textContent=`${all.length}건 · ${ago} 기준`;
+    const pr = (d.priceMin||d.priceMax)
+      ? `${(d.priceMin||0).toLocaleString()}~${d.priceMax?d.priceMax.toLocaleString():"제한없음"}만원`
+      : "전체";
     document.getElementById("info").innerHTML =
       `🔍 <b>검색어</b> ${(d.keywords||[]).join(", ")||"-"}<br>` +
-      `⏰ <b>검색 시각</b> ${(d.times||[]).join(" · ")||"-"} (하루 ${(d.times||[]).length}회)<br>` +
+      `💰 <b>금액</b> ${pr}　⏰ <b>검색 시각</b> ${(d.times||[]).join(" · ")||"-"}<br>` +
       `🌐 <b>체크한 사이트</b> ${(d.sites||[]).join(" · ")||"-"}`;
+    if (!canEdit) settings.priceMin=d.priceMin||0, settings.priceMax=d.priceMax||0;
     buildFilters(); render();
   }
   boot();

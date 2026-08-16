@@ -45,13 +45,13 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       return res.end(html);
     }
-    if (url.pathname === "/snapshot.json") {
+    if (url.pathname === "/snapshot.json" || url.pathname === "/snapshot.local.json") {
       try {
-        const snap = await readFile(new URL("./docs/snapshot.json", import.meta.url), "utf8");
+        const snap = await readFile(new URL("./docs" + url.pathname, import.meta.url), "utf8");
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
         return res.end(snap);
       } catch {
-        return json(res, 404, { error: "snapshot 없음 — `node scripts/snapshot.js` 먼저 실행" });
+        return json(res, 404, { error: "snapshot 없음" });
       }
     }
     if (url.pathname === "/live") {
@@ -66,7 +66,9 @@ const server = createServer(async (req, res) => {
         const body = await readBody(req);
         const keywords = (body.keywords || []).map((k) => String(k).trim()).filter(Boolean);
         const times = (body.times || []).filter((t) => /^\d{2}:\d{2}$/.test(t)).slice(0, 6);
-        await writeFile(dir + "settings.json", JSON.stringify({ keywords, times }, null, 2));
+        const priceMin = Math.max(0, Number(body.priceMin) || 0);
+        const priceMax = Math.max(0, Number(body.priceMax) || 0);
+        await writeFile(dir + "settings.json", JSON.stringify({ keywords, times, priceMin, priceMax }, null, 2));
         // 모든 config의 keywords 동기화
         for (const f of ["config.json", "config.cloud.json", "config.local.json"]) {
           try {

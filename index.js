@@ -112,6 +112,11 @@ async function main() {
   // 이번 실행 전에 이미 본 ID 집합(신규 판별용)
   const prevSeen = new Set(seen);
 
+  // 금액 범위(만원 단위 → 원). max=0 이면 상한 없음. 가격문의(price=null)는 통과.
+  const minW = (settings.priceMin || 0) * 10000;
+  const maxW = (settings.priceMax || 0) * 10000;
+  const inPriceRange = (p) => p == null || (p >= minW && (maxW === 0 || p <= maxW));
+
   let newCount = 0;
   for (const item of found) {
     // 최초 실행이 아니고, 이전에 못 본 매물이면 '신규'
@@ -119,13 +124,15 @@ async function main() {
     if (seen.has(item.id)) continue;
     seen.add(item.id);
     newCount++;
-    if (!firstRun) await notify(item);
+    // 예산 범위 안(또는 가격문의)일 때만 알림
+    if (!firstRun && inPriceRange(item.price)) await notify(item);
   }
   await saveSeen(seen);
 
-  // 대시보드용 스냅샷 저장(현재 매물 전체) — 웹에서 이 파일을 읽어 보여준다.
-  // NO_SNAPSHOT=1 이면 건너뜀(맥 로그인전용 실행이 클라우드 스냅샷을 덮어쓰지 않도록)
-  if (!process.env.NO_SNAPSHOT) {
+  // 대시보드용 스냅샷 저장 — 클라우드는 snapshot.json, 맥(로그인2곳)은 snapshot.local.json.
+  // 대시보드가 둘을 합쳐서 보여준다.
+  {
+    const snapFile = process.env.SNAPSHOT_FILE || "snapshot.json";
     const outDir = new URL("./docs/", import.meta.url).pathname;
     await mkdir(outDir, { recursive: true });
     const SITE_LABEL = {
@@ -136,12 +143,14 @@ async function main() {
       .filter(([, v]) => v?.enabled)
       .map(([k]) => SITE_LABEL[k] || k);
     await writeFile(
-      outDir + "snapshot.json",
+      outDir + snapFile,
       JSON.stringify({
         updatedAt: new Date().toISOString(),
         keywords,
         times: settings.times,
         sites: checkedSites,
+        priceMin: settings.priceMin || 0,
+        priceMax: settings.priceMax || 0,
         count: found.length,
         items: found,
       }),
