@@ -2,6 +2,7 @@
 // 브라우저는 한 번만 띄워 재사용(스크래핑 속도↑).
 import { createServer } from "node:http";
 import { readFile, writeFile } from "node:fs/promises";
+import { execSync } from "node:child_process";
 import { chromium } from "playwright";
 import { scrapeJoongna } from "./scrapers/joongna.js";
 import { scrapeWatchexchange } from "./scrapers/watchexchange.js";
@@ -56,6 +57,33 @@ const server = createServer(async (req, res) => {
     if (url.pathname === "/live") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       return res.end(PAGE);
+    }
+
+    // 설정(검색어·검색시각) 조회/저장 — 로컬에서만 편집. 저장 시 클라우드까지 반영.
+    if (url.pathname === "/api/settings") {
+      const dir = new URL("./", import.meta.url).pathname;
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        const keywords = (body.keywords || []).map((k) => String(k).trim()).filter(Boolean);
+        const times = (body.times || []).filter((t) => /^\d{2}:\d{2}$/.test(t)).slice(0, 6);
+        await writeFile(dir + "settings.json", JSON.stringify({ keywords, times }, null, 2));
+        // 모든 config의 keywords 동기화
+        for (const f of ["config.json", "config.cloud.json", "config.local.json"]) {
+          try {
+            const c = JSON.parse(await readFile(dir + f, "utf8"));
+            c.keywords = keywords;
+            await writeFile(dir + f, JSON.stringify(c, null, 2));
+          } catch {}
+        }
+        await regenSchedules(dir, times);
+        const pushed = gitPush(dir);
+        return json(res, 200, { ok: true, pushed });
+      }
+      try {
+        return json(res, 200, JSON.parse(await readFile(dir + "settings.json", "utf8")));
+      } catch {
+        return json(res, 200, { keywords: [], times: ["09:00", "15:00", "21:00"] });
+      }
     }
 
     if (url.pathname === "/api/keywords") {
@@ -140,6 +168,56 @@ const server = createServer(async (req, res) => {
     json(res, 500, { error: String(e) });
   }
 });
+
+// 검색 시각(KST)으로 GitHub Actions cron과 맥 launchd를 다시 생성.
+async function regenSchedules(dir, times) {
+  if (!times.length) return;
+  // GitHub Actions cron (UTC = KST - 9)
+  const crons = times
+    .map((t) => {
+      const [h, m] = t.split(":").map(Number);
+      return `    - cron: "${m} ${(h - 9 + 24) % 24} * * *"`;
+    })
+    .join("\n");
+  try {
+    const wf = dir + ".github/workflows/check.yml";
+    let y = await readFile(wf, "utf8");
+    y = y.replace(/  schedule:\n(?:    - cron: "[^"]*"\n)+/, `  schedule:\n${crons}\n`);
+    await writeFile(wf, y);
+  } catch (e) {
+    console.warn("workflow cron 갱신 실패:", e.message);
+  }
+  // 맥 launchd plist StartCalendarInterval
+  const intervals = times
+    .map((t) => {
+      const [h, m] = t.split(":").map(Number);
+      return `        <dict><key>Hour</key><integer>${h}</integer><key>Minute</key><integer>${m}</integer></dict>`;
+    })
+    .join("\n");
+  try {
+    const plist = process.env.HOME + "/Library/LaunchAgents/com.watchalert.check.plist";
+    let p = await readFile(plist, "utf8");
+    p = p.replace(/    <array>\n(?:        <dict><key>Hour<\/key>[\s\S]*?<\/dict>\n)+    <\/array>/, `    <array>\n${intervals}\n    </array>`);
+    await writeFile(plist, p);
+    execSync(`launchctl unload "${plist}" 2>/dev/null; launchctl load "${plist}"`, { shell: "/bin/zsh" });
+  } catch (e) {
+    console.warn("launchd 갱신 실패:", e.message);
+  }
+}
+
+// 변경사항을 GitHub에 push(클라우드 반영). 성공 여부 반환.
+function gitPush(dir) {
+  try {
+    execSync(
+      `cd "${dir}" && git add settings.json config*.json .github/workflows/check.yml && ` +
+        `git commit -m "chore: 검색어/시각 편집" && git push`,
+      { shell: "/bin/zsh", stdio: "ignore" }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function readBody(req) {
   return new Promise((resolve) => {

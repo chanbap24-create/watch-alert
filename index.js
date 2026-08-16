@@ -22,6 +22,21 @@ import { isFresh } from "./lib/freshness.js";
 // CONFIG 환경변수로 설정파일 선택(클라우드=config.cloud.json / 맥=config.local.json)
 const config = JSON.parse(await readFile(new URL(`./${process.env.CONFIG || "config.json"}`, import.meta.url), "utf8"));
 
+// 검색어·검색시각은 settings.json에서 중앙 관리(대시보드에서 편집). 없으면 config로 폴백.
+let settings = { keywords: config.keywords, times: ["09:00", "15:00", "21:00"] };
+try {
+  settings = { ...settings, ...JSON.parse(await readFile(new URL("./settings.json", import.meta.url), "utf8")) };
+} catch {}
+const keywords = settings.keywords?.length ? settings.keywords : config.keywords;
+
+// 매물 제목에 모든 토큰이 들어있는 첫 키워드를 태그(어떤 검색어로 걸렸는지)
+function tagKeyword(item) {
+  const t = (item.title || "").toLowerCase();
+  item.keyword =
+    keywords.find((k) => k.split(/\s+/).every((tok) => t.includes(tok.toLowerCase()))) || keywords[0];
+  return item;
+}
+
 async function main() {
   const seen = await loadSeen();
   const firstRun = seen.size === 0; // 최초 실행은 알림 폭탄 방지: 기록만 하고 조용히 넘어감
@@ -33,57 +48,58 @@ async function main() {
   });
 
   const found = [];
-  for (const keyword of config.keywords) {
+  for (const keyword of keywords) {
     // 중고나라: 브라우저로 검색 응답 가로채기
     if (config.sites.joongna?.enabled) {
       const items = await scrapeJoongna(context, keyword);
       console.log(`[중고나라] '${keyword}': ${items.length}건`);
-      found.push(...items);
+      found.push(...items.map((i) => ((i.keyword = keyword), i)));
     }
     // 번개장터: 공개 API 직접 검색(브라우저 불필요)
     if (config.sites.bunjang?.enabled) {
       const items = await scrapeBunjang(keyword);
       console.log(`[번개장터] '${keyword}': ${items.length}건`);
-      found.push(...items);
+      found.push(...items.map((i) => ((i.keyword = keyword), i)));
     }
     // 바이버: 공개 API 직접 검색(브라우저 불필요)
     if (config.sites.viver?.enabled) {
       const items = await scrapeViver(keyword);
       console.log(`[바이버] '${keyword}': ${items.length}건`);
-      found.push(...items);
+      found.push(...items.map((i) => ((i.keyword = keyword), i)));
     }
     // 캉카스: 쇼핑몰 검색 HTML 파싱(브라우저 불필요)
     if (config.sites.kangkas?.enabled) {
       const items = await scrapeKangkas(keyword);
       console.log(`[캉카스] '${keyword}': ${items.length}건`);
-      found.push(...items);
+      found.push(...items.map((i) => ((i.keyword = keyword), i)));
     }
     // 필웨이: 공개 API 직접 검색(브라우저 불필요)
     if (config.sites.feelway?.enabled) {
       const items = await scrapeFeelway(keyword);
       console.log(`[필웨이] '${keyword}': ${items.length}건`);
-      found.push(...items);
+      found.push(...items.map((i) => ((i.keyword = keyword), i)));
     }
   }
   await browser.close();
 
+  // 아래 3곳은 키워드 배열을 한 번에 받으므로, 결과를 제목 기준으로 키워드 태깅
   // 시계거래소: 개인매물 목록을 받아 키워드로 필터(별도 로그인 프로필 사용)
-  if (config.sites.watchexchange?.enabled && config.keywords.length) {
-    const items = await scrapeWatchexchange(config.keywords);
+  if (config.sites.watchexchange?.enabled && keywords.length) {
+    const items = await scrapeWatchexchange(keywords);
     console.log(`[시계거래소] 개인매물 매칭: ${items.length}건`);
-    found.push(...items);
+    found.push(...items.map(tagKeyword));
   }
   // 타임포럼: 로그인 프로필로 회원장터 검색
-  if (config.sites.timeforum?.enabled && config.keywords.length) {
-    const items = await scrapeTimeforum(config.keywords);
+  if (config.sites.timeforum?.enabled && keywords.length) {
+    const items = await scrapeTimeforum(keywords);
     console.log(`[타임포럼] 매칭: ${items.length}건`);
-    found.push(...items);
+    found.push(...items.map(tagKeyword));
   }
   // 구구스: 브라우저로 브랜드 검색 → 시계 필터
-  if (config.sites.gugus?.enabled && config.keywords.length) {
-    const items = await scrapeGugus(config.keywords);
+  if (config.sites.gugus?.enabled && keywords.length) {
+    const items = await scrapeGugus(keywords);
     console.log(`[구구스] 매칭: ${items.length}건`);
-    found.push(...items);
+    found.push(...items.map(tagKeyword));
   }
 
   // 오래된(사실상 죽은) 매물 제거 — maxAgeDays 이내만. 날짜 불명 사이트는 유지.
@@ -112,9 +128,23 @@ async function main() {
   if (!process.env.NO_SNAPSHOT) {
     const outDir = new URL("./docs/", import.meta.url).pathname;
     await mkdir(outDir, { recursive: true });
+    const SITE_LABEL = {
+      joongna: "중고나라", bunjang: "번개장터", viver: "바이버", kangkas: "캉카스",
+      feelway: "필웨이", gugus: "구구스", watchexchange: "시계거래소", timeforum: "타임포럼",
+    };
+    const checkedSites = Object.entries(config.sites)
+      .filter(([, v]) => v?.enabled)
+      .map(([k]) => SITE_LABEL[k] || k);
     await writeFile(
       outDir + "snapshot.json",
-      JSON.stringify({ updatedAt: new Date().toISOString(), keywords: config.keywords, count: found.length, items: found }),
+      JSON.stringify({
+        updatedAt: new Date().toISOString(),
+        keywords,
+        times: settings.times,
+        sites: checkedSites,
+        count: found.length,
+        items: found,
+      }),
       "utf8"
     );
   }
