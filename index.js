@@ -1,5 +1,5 @@
 // 진입점: 설정된 키워드로 각 사이트를 검색 → 처음 보는 매물만 알림.
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
 import { loadSeen, saveSeen } from "./lib/store.js";
 import { notify } from "./lib/notify.js";
@@ -80,10 +80,19 @@ async function main() {
   }
   await saveSeen(seen);
 
+  // 대시보드용 스냅샷 저장(현재 매물 전체) — 웹에서 이 파일을 읽어 보여준다.
+  const outDir = new URL("./public/", import.meta.url).pathname;
+  await mkdir(outDir, { recursive: true });
+  await writeFile(
+    outDir + "snapshot.json",
+    JSON.stringify({ updatedAt: new Date().toISOString(), keywords: config.keywords, count: found.length, items: found }),
+    "utf8"
+  );
+
   console.log(
     firstRun
-      ? `최초 실행: ${newCount}건 기록(알림 생략). 다음 실행부터 새 매물만 알림.`
-      : `새 매물 ${newCount}건 알림 완료.`
+      ? `최초 실행: ${newCount}건 기록(알림 생략). 스냅샷 ${found.length}건 저장.`
+      : `새 매물 ${newCount}건 알림 완료. 스냅샷 ${found.length}건 저장.`
   );
 }
 

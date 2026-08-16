@@ -38,7 +38,21 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   try {
-    if (url.pathname === "/") {
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      const html = await readFile(new URL("./public/index.html", import.meta.url), "utf8");
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(html);
+    }
+    if (url.pathname === "/snapshot.json") {
+      try {
+        const snap = await readFile(new URL("./public/snapshot.json", import.meta.url), "utf8");
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        return res.end(snap);
+      } catch {
+        return json(res, 404, { error: "snapshot 없음 — `node scripts/snapshot.js` 먼저 실행" });
+      }
+    }
+    if (url.pathname === "/live") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       return res.end(PAGE);
     }
