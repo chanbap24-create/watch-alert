@@ -1,0 +1,19 @@
+{
+  "keywords": [
+    "브레게 마린"
+  ],
+  "sites": {
+    "joongna": {
+      "enabled": true
+    },
+    "bunjang": {
+      "enabled": true
+    },
+    "viver": {
+      "enabled": true
+    },
+    "watchexchange": {
+      "enabled": true
+    }
+  }
+}

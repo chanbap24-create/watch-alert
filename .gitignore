@@ -1,0 +1,6 @@
+node_modules/
+data/seen.json
+data/*.state.json
+data/wx-chrome-profile/
+data/joongna-sample.json
+.env
