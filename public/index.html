@@ -31,6 +31,8 @@
   .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .badge { position: absolute; left: 7px; top: 7px; background: rgba(0,0,0,.72); color: #fff;
     font-size: .66rem; padding: 3px 7px; border-radius: 999px; letter-spacing: -.01em; }
+  .new { position: absolute; right: 7px; top: 7px; background: var(--up); color: #fff;
+    font-size: .64rem; font-weight: 700; padding: 3px 7px; border-radius: 999px; }
   .title { font-size: .82rem; line-height: 1.34; margin: 8px 2px 0;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .price { font-size: .92rem; font-weight: 700; margin: 4px 2px 0; font-variant-numeric: tabular-nums; }
@@ -68,7 +70,7 @@
     let list = site === "전체" ? all : all.filter(i => i.site === site);
     if (sort === "priceUp") list = [...list].sort((a,b)=>(a.price||1e15)-(b.price||1e15));
     else if (sort === "priceDown") list = [...list].sort((a,b)=>(b.price||0)-(a.price||0));
-    else if (sort === "new") list = [...list].sort((a,b)=>(toMs(b.date)||0)-(toMs(a.date)||0));
+    else if (sort === "new") list = [...list].sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0) || (toMs(b.date)||0)-(toMs(a.date)||0));
     else list = [...list].sort((a,b)=>SITE_ORDER.indexOf(a.site)-SITE_ORDER.indexOf(b.site));
 
     document.getElementById("empty").style.display = list.length ? "none" : "block";
@@ -77,6 +79,7 @@
         <div class="ph">
           ${i.image ? `<img loading="lazy" src="${i.image}" alt="" onerror="this.style.display='none'">` : ""}
           <span class="badge">${i.site}</span>
+          ${i.isNew ? `<span class="new">🆕 NEW</span>` : ""}
         </div>
         <div class="title">${i.title}</div>
         <div class="price">${i.price ? won(i.price) : '<span class="ask">가격문의</span>'}${i.date ? `<span class="age"> · ${ageLabel(i.date)}</span>` : ''}</div>

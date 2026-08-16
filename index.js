@@ -85,8 +85,13 @@ async function main() {
   found.length = 0;
   found.push(...fresh);
 
+  // 이번 실행 전에 이미 본 ID 집합(신규 판별용)
+  const prevSeen = new Set(seen);
+
   let newCount = 0;
   for (const item of found) {
+    // 최초 실행이 아니고, 이전에 못 본 매물이면 '신규'
+    item.isNew = !firstRun && !prevSeen.has(item.id);
     if (seen.has(item.id)) continue;
     seen.add(item.id);
     newCount++;
