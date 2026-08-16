@@ -21,7 +21,7 @@
       "enabled": true
     },
     "timeforum": {
-      "enabled": true
+      "enabled": false
     },
     "watchexchange": {
       "enabled": true

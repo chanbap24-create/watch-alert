@@ -27,7 +27,7 @@
       "enabled": true
     },
     "timeforum": {
-      "enabled": true
+      "enabled": false
     }
   }
 }
