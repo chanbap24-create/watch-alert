@@ -25,23 +25,33 @@
     backdrop-filter:saturate(1.4) blur(10px); border-bottom:1px solid var(--line); z-index:5;
     padding:env(safe-area-inset-top) 0 0; }
   .hwrap { max-width:1040px; margin:0 auto; padding:14px 18px 10px; }
-  .toprow { display:flex; align-items:baseline; gap:11px; }
-  h1 { margin:0; font-size:2rem; line-height:.95; letter-spacing:.01em; color:var(--ink);
-    font-family:'Instrument Serif',Georgia,serif; font-weight:400; }
+  .toprow { display:flex; align-items:baseline; gap:10px; }
+  h1 { margin:0; font-size:1.65rem; line-height:.95; letter-spacing:.01em; color:var(--ink);
+    font-family:'Instrument Serif',Georgia,serif; font-weight:400; flex:none; }
   h1 .amp { color:var(--blue); font-style:italic; }
-  .meta { color:var(--sub); font-size:.74rem; letter-spacing:0; }
+  .meta { color:var(--sub); font-size:.74rem; letter-spacing:0; flex:1; min-width:0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* 라이브 데이트라인 */
   .updated { display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:.72rem;
     color:var(--ink); font-weight:500; }
   .updated::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--blue);
     box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 18%,transparent); }
   /* 스펙 라인: 작은 대문자 라벨 + 값 */
-  .info { margin-top:9px; display:grid; grid-template-columns:auto 1fr; gap:2px 12px; font-size:.75rem; align-items:baseline; }
+  .info { margin:0 0 16px; padding-bottom:14px; border-bottom:1px solid var(--line);
+    display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:.75rem; align-items:baseline; }
   .info dt { color:var(--sub); font-size:.62rem; letter-spacing:.09em; text-transform:uppercase; white-space:nowrap; }
   .info dd { margin:0; color:var(--ink); }
-  .gear { margin-left:auto; border:1px solid var(--line); background:var(--paper); border-radius:9px;
+  .tools { margin-left:auto; display:flex; gap:6px; align-items:center; }
+  .tbtn { border:1px solid var(--line); background:var(--paper); border-radius:9px;
+    font-size:.78rem; padding:6px 10px; cursor:pointer; color:var(--ink); font-family:inherit; line-height:1; }
+  .tbtn:active { background:var(--card); }
+  .tbtn.on { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .gear { border:1px solid var(--line); background:var(--paper); border-radius:9px;
     font-size:.78rem; padding:6px 11px; cursor:pointer; color:var(--ink); font-family:inherit; }
   .gear:active { background:var(--card); }
+  /* 접이식 서랍: 기본 숨김 */
+  .drawer { display:none; }
+  .drawer.open { display:block; }
 
   .row { display:flex; gap:6px; align-items:center; margin-top:11px; overflow-x:auto; padding-bottom:2px;
     -webkit-overflow-scrolling:touch; scrollbar-width:none; }
@@ -141,20 +151,31 @@
     <div class="toprow">
       <h1>watch<span class="amp">·</span>alert</h1>
       <span class="meta" id="meta">불러오는 중…</span>
-      <button class="gear" id="gear" style="display:none" onclick="togglePanel()">편집</button>
+      <div class="tools">
+        <button class="tbtn" id="btnSearch" onclick="toggleDrawer('search')">🔍</button>
+        <button class="tbtn" id="btnFilter" onclick="toggleDrawer('filter')">필터</button>
+        <button class="gear" id="gear" style="display:none" onclick="togglePanel()">편집</button>
+      </div>
     </div>
-    <div class="updated" id="updated"></div>
-    <div class="searchbar">
-      <input id="q" enterkeyhint="search" placeholder="시계 실시간 검색 (예: 롤렉스 서브마리너)">
-      <button id="qbtn" onclick="liveSearch()">검색</button>
-    </div>
-    <div class="qnote" id="qnote"></div>
-    <div class="row" id="savedrow"></div>
-    <dl class="info" id="info"></dl>
-    <div class="row" id="kwrow"></div>
+    <!-- 사이트 필터: 항상 노출(주 탐색 수단) -->
     <div class="row" id="siterow"></div>
-    <div class="row" id="pricerow"></div>
+    <!-- 검색 서랍 -->
+    <div class="drawer" id="searchDrawer">
+      <div class="searchbar">
+        <input id="q" enterkeyhint="search" placeholder="시계 실시간 검색 (예: 롤렉스 서브마리너)">
+        <button id="qbtn" onclick="liveSearch()">검색</button>
+      </div>
+      <div class="qnote" id="qnote"></div>
+      <div class="row" id="savedrow"></div>
+    </div>
+    <!-- 필터 서랍(검색어·금액) -->
+    <div class="drawer" id="filterDrawer">
+      <div class="row" id="kwrow"></div>
+      <div class="row" id="pricerow"></div>
+    </div>
+    <!-- 편집 패널 -->
     <div class="panel" id="panel">
+      <dl class="info" id="info"></dl>
       <h3>검색어 (여러 개 추가 가능 · 저장 시 클라우드에도 반영)</h3>
       <div class="edit-list" id="kwEdit"></div>
       <div class="addbar">
@@ -168,7 +189,7 @@
       </div>
       <h3>알림 기준 (며칠 이내 등록된 새 매물만 알림 · 0=제한없음)</h3>
       <div class="price-inputs"><input type="number" id="aAge" min="0"><span>일 이내</span></div>
-      <h3>검색 시각 (하루 3회 · 시각 변경은 맥에서만 적용됨)</h3>
+      <h3>검색 시각 (하루 5회 · 시각 변경은 맥에서만 적용됨)</h3>
       <div class="times" id="timesEdit"></div>
       <div style="margin-top:12px"><button class="saveBtn" onclick="save()">💾 저장하고 적용</button>
         <span class="savenote" id="saveNote"></span></div>
@@ -330,8 +351,17 @@
   function closeSearch(){ liveResults=null; all=snapAll; curQ=null; document.getElementById("q").value="";
     qnote().className="qnote"; buildFilters(); render(); renderSaved(); }
 
+  // ===== 서랍(검색 / 필터) 토글 =====
+  function toggleDrawer(name){
+    const id = name==="search" ? "searchDrawer" : "filterDrawer";
+    const open = document.getElementById(id).classList.toggle("open");
+    document.getElementById(name==="search"?"btnSearch":"btnFilter").classList.toggle("on",open);
+    if(open && name==="search") document.getElementById("q").focus();
+  }
+
   // ===== 편집 패널 =====
-  function togglePanel(){ document.getElementById("panel").classList.toggle("open"); renderPanel(); }
+  function togglePanel(){ const o=document.getElementById("panel").classList.toggle("open");
+    document.getElementById("gear").classList.toggle("on",o); renderPanel(); }
   function renderPanel(){
     document.getElementById("kwEdit").innerHTML = settings.keywords.map((k,idx)=>
       `<span class="edit-chip">${k}<button onclick="delKw(${idx})">×</button></span>`).join("") || '<span class="savenote">검색어가 없습니다</span>';
@@ -411,8 +441,7 @@
     }
     const t=new Date(d.updatedAt);
     const upd=t.toLocaleString("ko-KR",{month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"});
-    document.getElementById("meta").textContent=`${all.length}점`;
-    document.getElementById("updated").textContent=`업데이트 ${upd}`;
+    document.getElementById("meta").textContent=`${all.length}점 · ${upd}`;
     const pr = (d.priceMin||d.priceMax)
       ? `${(d.priceMin||0).toLocaleString()}–${d.priceMax?d.priceMax.toLocaleString():"제한없음"}만원`
       : "전체";
