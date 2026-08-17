@@ -10,6 +10,7 @@ import { scrapeFeelway } from "../scrapers/feelway.js";
 import { scrapeTimeforum } from "../scrapers/timeforum.js";
 import { scrapeWatchexchange } from "../scrapers/watchexchange.js";
 import { scrapeGugus } from "../scrapers/gugus.js";
+import { scrapeHisigan } from "../scrapers/hisigan.js";
 import { isFresh } from "../lib/freshness.js";
 
 const config = JSON.parse(await readFile(new URL("../config.json", import.meta.url), "utf8"));
@@ -34,6 +35,7 @@ await browser.close();
 if (config.sites.watchexchange?.enabled) items.push(...(await scrapeWatchexchange(config.keywords)));
 if (config.sites.timeforum?.enabled) items.push(...(await scrapeTimeforum(config.keywords)));
 if (config.sites.gugus?.enabled) items.push(...(await scrapeGugus(config.keywords)));
+if (config.sites.hisigan?.enabled) items.push(...(await scrapeHisigan(config.keywords)));
 
 const fresh = items.filter((i) => isFresh(i, config.maxAgeDays));
 console.log(`최근 ${config.maxAgeDays || "∞"}일 필터: ${items.length} → ${fresh.length}건`);

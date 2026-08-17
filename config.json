@@ -28,6 +28,9 @@
     },
     "gugus": {
       "enabled": true
+    },
+    "hisigan": {
+      "enabled": true
     }
   }
 }

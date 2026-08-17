@@ -17,6 +17,7 @@ import { scrapeKangkas } from "./scrapers/kangkas.js";
 import { scrapeFeelway } from "./scrapers/feelway.js";
 import { scrapeTimeforum } from "./scrapers/timeforum.js";
 import { scrapeGugus } from "./scrapers/gugus.js";
+import { scrapeHisigan } from "./scrapers/hisigan.js";
 import { isFresh, ageDays } from "./lib/freshness.js";
 
 // CONFIG 환경변수로 설정파일 선택(클라우드=config.cloud.json / 맥=config.local.json)
@@ -81,6 +82,13 @@ async function main() {
     }
   }
   await browser.close();
+
+  // 하이시간: 브랜드별 판매 API(쿠키 세션, 브라우저 불필요)
+  if (config.sites.hisigan?.enabled && keywords.length) {
+    const items = await scrapeHisigan(keywords);
+    console.log(`[하이시간] 매칭: ${items.length}건`);
+    found.push(...items.map(tagKeyword));
+  }
 
   // 아래 3곳은 키워드 배열을 한 번에 받으므로, 결과를 제목 기준으로 키워드 태깅
   // 시계거래소: 개인매물 목록을 받아 키워드로 필터(별도 로그인 프로필 사용)

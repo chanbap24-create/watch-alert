@@ -12,6 +12,7 @@ import { scrapeKangkas } from "./scrapers/kangkas.js";
 import { scrapeFeelway } from "./scrapers/feelway.js";
 import { scrapeTimeforum } from "./scrapers/timeforum.js";
 import { scrapeGugus } from "./scrapers/gugus.js";
+import { scrapeHisigan } from "./scrapers/hisigan.js";
 
 const CONFIG = new URL("./config.json", import.meta.url).pathname;
 const PORT = 5178;
@@ -155,6 +156,9 @@ const server = createServer(async (req, res) => {
         } catch (e) {
           console.warn("구구스 검색 실패:", e.message);
         }
+      }
+      if (cfg.sites.hisigan?.enabled) {
+        try { items.push(...(await scrapeHisigan([keyword]))); } catch (e) { console.warn("하이시간 검색 실패:", e.message); }
       }
       if (cfg.sites.watchexchange?.enabled) {
         try {

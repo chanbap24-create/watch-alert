@@ -28,6 +28,9 @@
     },
     "timeforum": {
       "enabled": false
+    },
+    "hisigan": {
+      "enabled": false
     }
   }
 }
