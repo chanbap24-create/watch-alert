@@ -118,6 +118,17 @@
   .times input { width:74px; font-size:16px; border:1px solid var(--line); border-radius:8px; padding:8px; margin-right:6px; font-family:inherit; }
   .savenote { font-size:.72rem; color:var(--sub); margin-top:9px; line-height:1.6; }
   .savenote a { color:var(--blue); }
+  /* 실시간 검색 바 */
+  .searchbar { display:flex; gap:8px; margin-top:11px; }
+  .searchbar input { flex:1; font-size:16px; border:1px solid var(--line); border-radius:9px;
+    padding:9px 12px; min-width:0; font-family:inherit; background:var(--paper); color:var(--ink); }
+  .searchbar input:focus { outline:none; border-color:var(--blue); }
+  .searchbar button { flex:none; border:none; background:var(--blue); color:#fff; border-radius:9px;
+    padding:9px 16px; font-size:.85rem; font-weight:600; cursor:pointer; font-family:inherit; }
+  .qnote { font-size:.73rem; margin-top:8px; color:var(--sub); display:none; }
+  .qnote.show { display:block; }
+  .qnote .x { color:var(--blue); cursor:pointer; text-decoration:underline; margin-left:6px; }
+  .qnote b { color:var(--ink); font-weight:600; }
 </style>
 </head>
 <body>
@@ -129,6 +140,11 @@
       <button class="gear" id="gear" style="display:none" onclick="togglePanel()">편집</button>
     </div>
     <div class="updated" id="updated"></div>
+    <div class="searchbar">
+      <input id="q" enterkeyhint="search" placeholder="시계 실시간 검색 (예: 롤렉스 서브마리너)">
+      <button id="qbtn" onclick="liveSearch()">검색</button>
+    </div>
+    <div class="qnote" id="qnote"></div>
     <dl class="info" id="info"></dl>
     <div class="row" id="kwrow"></div>
     <div class="row" id="siterow"></div>
@@ -166,6 +182,7 @@
 <script>
   const SITE_ORDER = ["시계거래소","바이버","번개장터","중고나라","캉카스","필웨이","타임포럼","구구스"];
   let all=[], site="전체", sort="new", kwActive=new Set(), settings={keywords:[],times:[],priceMin:0,priceMax:0,alertMaxAgeDays:0}, hasLocalApi=false;
+  let snapAll=[], liveResults=null; // 모아둔 스냅샷 백업 / 실시간 검색 결과
   let viewMin=0, viewMax=0; // 화면 즉시 금액필터(만원). 설정과 별개, 저장 불필요.
   const PMAX=10000; // 슬라이더 상한 1억(만원). 이 값이면 '제한없음'(그 이상 전부 포함).
   const fmtMan = v => v>=10000 ? (v/10000).toLocaleString(undefined,{maximumFractionDigits:1})+"억" : v.toLocaleString()+"만";
@@ -258,6 +275,30 @@
     sync(false);
   }
 
+  // ===== 실시간 검색 =====
+  const qnote=()=>document.getElementById("qnote");
+  async function liveSearch(){
+    const kw=document.getElementById("q").value.trim(); if(!kw) return;
+    if(!hasLocalApi){
+      qnote().className="qnote show";
+      qnote().innerHTML="📱 실시간 웹 검색은 <b>맥(localhost:5178)</b>에서만 됩니다. 폰은 브라우저 보안(CORS)·렌더링 제약으로 불가. 아래는 모아둔 결과에서 '"+kw+"' 필터 결과입니다.";
+      // 폰 폴백: 모아둔 결과 글자검색
+      all=snapAll.filter(i=>(i.title||"").toLowerCase().includes(kw.toLowerCase())); buildFilters(); render(); return;
+    }
+    const btn=document.getElementById("qbtn"); btn.textContent="검색중"; btn.disabled=true;
+    qnote().className="qnote show"; qnote().innerHTML=`<b>'${kw}'</b> 전 사이트 실시간 조사 중… (수십 초 소요)`;
+    try{
+      const r=await fetch("/api/search?keyword="+encodeURIComponent(kw));
+      const j=await r.json();
+      liveResults=j.items||[]; all=liveResults; site="전체"; kwActive.clear();
+      buildFilters(); render();
+      qnote().innerHTML=`<b>'${kw}'</b> 실시간 검색 결과 ${liveResults.length}건 <span class="x" onclick="closeSearch()">모아둔 목록으로 ✕</span>`;
+    }catch(e){ qnote().innerHTML="검색 실패: "+e.message+' <span class="x" onclick="closeSearch()">닫기</span>'; }
+    btn.textContent="검색"; btn.disabled=false;
+  }
+  function closeSearch(){ liveResults=null; all=snapAll; document.getElementById("q").value="";
+    qnote().className="qnote"; buildFilters(); render(); }
+
   // ===== 편집 패널 =====
   function togglePanel(){ document.getElementById("panel").classList.toggle("open"); renderPanel(); }
   function renderPanel(){
@@ -327,7 +368,8 @@
       sites: [...(cloud.sites||[]), ...(local.sites||[])],
       updatedAt: new Date(Math.max(cU,lU)||Date.now()).toISOString(),
     };
-    all=d.items||[];
+    all=d.items||[]; snapAll=all;
+    document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")liveSearch();});
     // 화면 금액필터 초기값 = 설정값(있으면). 이후 화면에서 즉시 조절 가능(저장 불필요).
     viewMin=d.priceMin||0; viewMax=d.priceMax||0;
     if(!hasLocalApi){
