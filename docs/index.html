@@ -129,6 +129,10 @@
   .qnote.show { display:block; }
   .qnote .x { color:var(--blue); cursor:pointer; text-decoration:underline; margin-left:6px; }
   .qnote b { color:var(--ink); font-weight:600; }
+  .chip.saved { display:inline-flex; align-items:center; gap:2px; }
+  .chip.saved.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .chip .delx { border:none; background:none; color:inherit; opacity:.5; cursor:pointer; font-size:1rem;
+    line-height:1; padding:0 0 0 4px; margin:0; font-family:inherit; }
 </style>
 </head>
 <body>
@@ -145,6 +149,7 @@
       <button id="qbtn" onclick="liveSearch()">검색</button>
     </div>
     <div class="qnote" id="qnote"></div>
+    <div class="row" id="savedrow"></div>
     <dl class="info" id="info"></dl>
     <div class="row" id="kwrow"></div>
     <div class="row" id="siterow"></div>
@@ -277,12 +282,14 @@
 
   // ===== 실시간 검색 =====
   const qnote=()=>document.getElementById("qnote");
+  let curQ=null; // 방금 검색한 키워드(저장용)
+  let saved=[]; try{ saved=JSON.parse(localStorage.getItem("savedSearches")||"[]"); }catch{}
+
   async function liveSearch(){
     const kw=document.getElementById("q").value.trim(); if(!kw) return;
     if(!hasLocalApi){
       qnote().className="qnote show";
       qnote().innerHTML="📱 실시간 웹 검색은 <b>맥(localhost:5178)</b>에서만 됩니다. 폰은 브라우저 보안(CORS)·렌더링 제약으로 불가. 아래는 모아둔 결과에서 '"+kw+"' 필터 결과입니다.";
-      // 폰 폴백: 모아둔 결과 글자검색
       all=snapAll.filter(i=>(i.title||"").toLowerCase().includes(kw.toLowerCase())); buildFilters(); render(); return;
     }
     const btn=document.getElementById("qbtn"); btn.textContent="검색중"; btn.disabled=true;
@@ -290,14 +297,38 @@
     try{
       const r=await fetch("/api/search?keyword="+encodeURIComponent(kw));
       const j=await r.json();
-      liveResults=j.items||[]; all=liveResults; site="전체"; kwActive.clear();
+      liveResults=j.items||[]; all=liveResults; site="전체"; kwActive.clear(); curQ=kw;
       buildFilters(); render();
-      qnote().innerHTML=`<b>'${kw}'</b> 실시간 검색 결과 ${liveResults.length}건 <span class="x" onclick="closeSearch()">모아둔 목록으로 ✕</span>`;
+      showResultNote();
     }catch(e){ qnote().innerHTML="검색 실패: "+e.message+' <span class="x" onclick="closeSearch()">닫기</span>'; }
     btn.textContent="검색"; btn.disabled=false;
   }
-  function closeSearch(){ liveResults=null; all=snapAll; document.getElementById("q").value="";
-    qnote().className="qnote"; buildFilters(); render(); }
+  function showResultNote(){
+    const isSaved = saved.some(s=>s.q===curQ);
+    qnote().className="qnote show";
+    qnote().innerHTML=`<b>'${curQ}'</b> 검색 결과 ${liveResults.length}건 `+
+      (isSaved?`<span class="x" onclick="unsaveCurrent()">★ 저장됨(해제)</span>`:`<span class="x" onclick="saveCurrent()">☆ 이 검색 저장</span>`)+
+      ` <span class="x" onclick="closeSearch()">닫기 ✕</span>`;
+  }
+  function persistSaved(){ localStorage.setItem("savedSearches",JSON.stringify(saved.slice(0,20))); renderSaved(); }
+  function saveCurrent(){ if(!curQ||!liveResults)return;
+    saved=saved.filter(s=>s.q!==curQ);
+    saved.unshift({q:curQ, ts:Date.now(), items:liveResults});
+    persistSaved(); showResultNote(); }
+  function unsaveCurrent(){ saved=saved.filter(s=>s.q!==curQ); persistSaved(); showResultNote(); }
+  function openSaved(i){ const s=saved[i]; if(!s)return;
+    liveResults=s.items; all=s.items; curQ=s.q; site="전체"; kwActive.clear();
+    document.getElementById("q").value=s.q; buildFilters(); render(); showResultNote(); renderSaved();
+    window.scrollTo({top:0,behavior:"smooth"}); }
+  function delSaved(i,ev){ ev&&ev.stopPropagation(); saved.splice(i,1); persistSaved(); }
+  function renderSaved(){
+    const el=document.getElementById("savedrow");
+    if(!saved.length){ el.innerHTML=""; return; }
+    el.innerHTML=`<span class="lbl">저장검색</span>`+
+      saved.map((s,i)=>`<span class="chip saved${curQ===s.q&&liveResults?' on':''}" onclick="openSaved(${i})">${s.q} <span class="n">${(s.items||[]).length}</span><button class="delx" onclick="delSaved(${i},event)">×</button></span>`).join("");
+  }
+  function closeSearch(){ liveResults=null; all=snapAll; curQ=null; document.getElementById("q").value="";
+    qnote().className="qnote"; buildFilters(); render(); renderSaved(); }
 
   // ===== 편집 패널 =====
   function togglePanel(){ document.getElementById("panel").classList.toggle("open"); renderPanel(); }
@@ -391,7 +422,7 @@
       row("알림가", pr) +
       row("검색시각", (d.times||[]).join(" · ")) +
       row("사이트", (d.sites||[]).join(" · "));
-    buildFilters(); render();
+    buildFilters(); render(); renderSaved();
   }
   boot();
 </script>
