@@ -127,13 +127,15 @@ async function main() {
 
   let newCount = 0;
   for (const item of found) {
-    // 최초 실행이 아니고, 이전에 못 본 매물이면 '신규'
-    item.isNew = !firstRun && !prevSeen.has(item.id);
-    if (seen.has(item.id)) continue;
-    seen.add(item.id);
-    newCount++;
-    // 신규 + 예산 범위 + 최근 등록일일 때만 알림
-    if (!firstRun && inPriceRange(item.price) && isRecent(item)) await notify(item);
+    const firstTime = !prevSeen.has(item.id);
+    // NEW 배지 = 처음 본 매물 + 등록일이 최근(옛 매물이 뒤늦게 잡혀도 NEW 안 붙음)
+    item.isNew = !firstRun && firstTime && isRecent(item);
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      newCount++;
+    }
+    // 알림 = NEW(신규+최근) + 예산 범위
+    if (item.isNew && inPriceRange(item.price)) await notify(item);
   }
   await saveSeen(seen);
 
