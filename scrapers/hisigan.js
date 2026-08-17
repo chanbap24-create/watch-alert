@@ -65,6 +65,8 @@ export async function scrapeHisigan(keywords, { pages = 2, limit = 100 } = {}) {
       }
       const arr = j.list || [];
       for (const p of arr) {
+        // 판매중만(SOLD-OUT/판매완료 제외). saleDate 있으면 팔린 것.
+        if (p.gubun !== "SALE_REGISTERED" || p.saleDate) continue;
         if (!tokenMatch(`${p.brand} ${p.brandEn} ${p.modelDetail} ${p.model} ${p.reference}`, kw)) continue;
         const n = normalize(p);
         if (seen.has(n.id)) continue;
