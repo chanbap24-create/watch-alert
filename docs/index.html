@@ -71,6 +71,7 @@
       <span class="meta" id="meta">불러오는 중…</span>
       <button class="gear" id="gear" style="display:none" onclick="togglePanel()">⚙️ 편집</button>
     </div>
+    <div class="meta" id="updated" style="margin-top:3px;font-weight:600;color:var(--fg)"></div>
     <div class="info" id="info"></div>
     <div class="row" id="kwrow"></div>
     <div class="row" id="siterow"></div>
@@ -86,10 +87,13 @@
         <input type="number" id="pMin" placeholder="최소" min="0"><span>만원 ~</span>
         <input type="number" id="pMax" placeholder="최대" min="0"><span>만원</span>
       </div>
-      <h3>검색 시각 (하루 3회, 24시간제)</h3>
+      <h3>알림 기준 (며칠 이내 등록된 새 매물만 알림 · 0=제한없음)</h3>
+      <div class="price-inputs"><input type="number" id="aAge" min="0"><span>일 이내</span></div>
+      <h3>검색 시각 (하루 3회 · 시각 변경은 맥에서만 적용됨)</h3>
       <div class="times" id="timesEdit"></div>
       <div style="margin-top:12px"><button class="saveBtn" onclick="save()">💾 저장하고 적용</button>
         <span class="savenote" id="saveNote"></span></div>
+      <div class="savenote" id="patHelp" style="display:none;margin-top:10px;line-height:1.6"></div>
     </div>
   </div>
 </header>
@@ -103,7 +107,7 @@
 </main>
 <script>
   const SITE_ORDER = ["시계거래소","바이버","번개장터","중고나라","캉카스","필웨이","타임포럼","구구스"];
-  let all=[], site="전체", sort="new", kwActive=new Set(), settings={keywords:[],times:[],priceMin:0,priceMax:0}, canEdit=false;
+  let all=[], site="전체", sort="new", kwActive=new Set(), settings={keywords:[],times:[],priceMin:0,priceMax:0,alertMaxAgeDays:0}, hasLocalApi=false;
   const cardHtml = (i) => `
     <a class="card" href="${i.url}" target="_blank" rel="noopener">
       <div class="ph">
@@ -179,39 +183,75 @@
     document.getElementById("pMax").value = settings.priceMax||"";
     document.getElementById("pMin").onchange = e=>settings.priceMin=Number(e.target.value)||0;
     document.getElementById("pMax").onchange = e=>settings.priceMax=Number(e.target.value)||0;
+    const aa=document.getElementById("aAge"); aa.value=settings.alertMaxAgeDays||""; aa.onchange=e=>settings.alertMaxAgeDays=Number(e.target.value)||0;
+    // 폰(로컬서버 없음)이면 GitHub 토큰 안내 표시
+    const ph=document.getElementById("patHelp");
+    if(!hasLocalApi && !localStorage.getItem("gh_pat")){
+      ph.style.display="block";
+      ph.innerHTML="📱 폰에서 저장하려면 GitHub 토큰이 한 번 필요합니다:<br>"+
+        "1) <a href='https://github.com/settings/tokens/new?scopes=repo&description=watch-alert' target='_blank'>여기서 토큰 생성</a> (repo 권한, 만료 no expiration)<br>"+
+        "2) 생성된 토큰 복사 → 저장 누르면 입력창에 붙여넣기 (폰에 1회 저장됨)";
+    } else ph.style.display="none";
   }
   function addKw(){ const v=document.getElementById("kwInput").value.trim(); if(!v)return;
     if(!settings.keywords.includes(v))settings.keywords.push(v); document.getElementById("kwInput").value=""; renderPanel(); }
   function delKw(i){ settings.keywords.splice(i,1); renderPanel(); }
+  const REPO="chanbap24-create/watch-alert";
   async function save(){
     const note=document.getElementById("saveNote"); note.textContent="저장 중…";
+    // 1) 맥 로컬 서버가 있으면 그쪽으로(스케줄까지 갱신)
+    if (hasLocalApi){
+      try{
+        const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(settings)});
+        const j=await r.json();
+        note.textContent = j.ok ? "✅ 저장됨. 다음 검색부터 적용" + (j.pushed?" (클라우드 반영)":"") : "저장 실패: "+(j.error||"");
+        return;
+      }catch(e){}
+    }
+    // 2) 폰/외부: GitHub에 직접 커밋(토큰 필요)
+    let pat=localStorage.getItem("gh_pat");
+    if(!pat){ pat=prompt("GitHub 토큰을 입력하세요 (한 번만). 만드는 법은 아래 안내 참고:"); if(!pat){note.textContent="취소됨";return;} localStorage.setItem("gh_pat",pat.trim()); }
     try{
-      const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(settings)});
-      const j=await r.json();
-      note.textContent = j.ok ? "✅ 저장됨. 다음 검색부터 적용" + (j.pushed?" (클라우드 반영됨)":"") : "저장 실패: "+(j.error||"");
-    }catch(e){ note.textContent="저장 실패(로컬 서버에서만 편집 가능)"; }
+      const url=`https://api.github.com/repos/${REPO}/contents/settings.json`;
+      const cur=await fetch(url,{headers:{Authorization:"token "+pat}}).then(r=>r.json());
+      const body={keywords:settings.keywords,times:settings.times,priceMin:settings.priceMin||0,priceMax:settings.priceMax||0,alertMaxAgeDays:settings.alertMaxAgeDays||0};
+      const content=btoa(unescape(encodeURIComponent(JSON.stringify(body,null,2)+"\n")));
+      const r=await fetch(url,{method:"PUT",headers:{Authorization:"token "+pat,"Content-Type":"application/json"},
+        body:JSON.stringify({message:"chore: 설정 편집(폰)",content,sha:cur.sha})});
+      if(r.ok){ note.textContent="✅ 저장됨. 다음 자동검색(최대 몇 시간)부터 적용됩니다"; }
+      else{ const e=await r.json(); note.textContent="저장 실패: "+(e.message||r.status)+(r.status===401?" (토큰 확인)":""); if(r.status===401)localStorage.removeItem("gh_pat"); }
+    }catch(e){ note.textContent="저장 실패: "+e.message; }
   }
 
   async function boot(){
-    // 로컬 서버면 편집 가능
-    try{ const s=await fetch("/api/settings"); if(s.ok){ settings=await s.json(); canEdit=true; document.getElementById("gear").style.display=""; } }catch{}
-    // 클라우드(6곳) + 로컬(시계거래소·타임포럼) 스냅샷을 합침
+    // 편집 버튼은 항상 표시(폰=GitHub 직접저장 / 맥=로컬서버)
+    document.getElementById("gear").style.display="";
+    try{ const s=await fetch("/api/settings"); if(s.ok){ settings=await s.json(); hasLocalApi=true; } }catch{}
+    // 클라우드(6곳) + 로컬(시계거래소) 스냅샷을 합침
     const bust="?"+Date.now();
     const [cloud, local] = await Promise.all([
       fetch("./snapshot.json"+bust).then(r=>r.json()).catch(()=>({items:[]})),
       fetch("./snapshot.local.json"+bust).then(r=>r.ok?r.json():{items:[]}).catch(()=>({items:[]})),
     ]);
+    // 두 스냅샷 중 최신 시각을 마지막 업데이트로
+    const cU=cloud.updatedAt?Date.parse(cloud.updatedAt):0, lU=local.updatedAt?Date.parse(local.updatedAt):0;
     const d = {
       ...cloud,
       items: [...(cloud.items||[]), ...(local.items||[])],
       sites: [...(cloud.sites||[]), ...(local.sites||[])],
-      updatedAt: cloud.updatedAt || local.updatedAt,
+      updatedAt: new Date(Math.max(cU,lU)||Date.now()).toISOString(),
     };
     all=d.items||[];
-    if(!canEdit){ settings={keywords:d.keywords||[],times:d.times||[],priceMin:d.priceMin||0,priceMax:d.priceMax||0}; }
+    if(!hasLocalApi){
+      // 폰: 저장소의 실제 settings.json을 읽어 정확한 현재값 확보(편집용)
+      settings = await fetch("https://raw.githubusercontent.com/"+REPO+"/main/settings.json"+bust)
+        .then(r=>r.json())
+        .catch(()=>({keywords:d.keywords||[],times:d.times||[],priceMin:d.priceMin||0,priceMax:d.priceMax||0,alertMaxAgeDays:d.alertMaxAgeDays||0}));
+    }
     const t=new Date(d.updatedAt);
-    const ago=t.toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
-    document.getElementById("meta").textContent=`${all.length}건 · ${ago} 기준`;
+    const upd=t.toLocaleString("ko-KR",{month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"});
+    document.getElementById("meta").textContent=`매물 ${all.length}건`;
+    document.getElementById("updated").textContent=`🕒 마지막 업데이트 ${upd}`;
     const pr = (d.priceMin||d.priceMax)
       ? `${(d.priceMin||0).toLocaleString()}~${d.priceMax?d.priceMax.toLocaleString():"제한없음"}만원`
       : "전체";

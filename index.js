@@ -159,6 +159,7 @@ async function main() {
         sites: checkedSites,
         priceMin: settings.priceMin || 0,
         priceMax: settings.priceMax || 0,
+        alertMaxAgeDays: settings.alertMaxAgeDays || 0,
         count: found.length,
         items: found,
       }),
