@@ -111,8 +111,10 @@ async function main() {
   }
 
   // 오래된(사실상 죽은) 매물 제거 — maxAgeDays 이내만. 날짜 불명 사이트는 유지.
+  // 단, 상태값(판매중)이 정확한 마켓(바이버)은 오래돼도 판매중이면 유효 → 나이 필터 제외.
+  const AGELESS_SITES = new Set(["바이버"]);
   const before = found.length;
-  const fresh = found.filter((i) => isFresh(i, config.maxAgeDays));
+  const fresh = found.filter((i) => AGELESS_SITES.has(i.site) || isFresh(i, config.maxAgeDays));
   if (config.maxAgeDays) console.log(`최근 ${config.maxAgeDays}일 필터: ${before} → ${fresh.length}건`);
   found.length = 0;
   found.push(...fresh);
