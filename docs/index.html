@@ -58,6 +58,22 @@
     background:var(--paper); color:var(--ink); font-family:inherit; }
   .pfin { flex:none; width:62px; font-size:16px; border:1px solid var(--line); border-radius:8px;
     padding:6px 8px; font-family:inherit; }
+  /* 금액 듀얼 레인지 슬라이더 */
+  #pricerow { overflow:visible; }
+  .range { position:relative; flex:1; height:30px; min-width:150px; }
+  .range-track { position:absolute; top:50%; left:0; right:0; height:3px; background:var(--line);
+    border-radius:2px; transform:translateY(-50%); }
+  .range-fill { position:absolute; top:50%; height:3px; background:var(--blue); border-radius:2px;
+    transform:translateY(-50%); }
+  .range input[type=range] { position:absolute; top:0; left:0; width:100%; height:30px; margin:0;
+    -webkit-appearance:none; appearance:none; background:none; pointer-events:none; }
+  .range input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px;
+    border-radius:50%; background:#fff; border:1.5px solid var(--blue);
+    box-shadow:0 1px 4px color-mix(in srgb,var(--blue) 35%,transparent); pointer-events:auto; cursor:pointer; }
+  .range input[type=range]::-moz-range-thumb { width:18px; height:18px; border-radius:50%; background:#fff;
+    border:1.5px solid var(--blue); box-shadow:0 1px 4px rgba(39,75,134,.35); pointer-events:auto; cursor:pointer; }
+  .rangeval { flex:none; font-size:.8rem; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; min-width:118px; }
+  .rangeval b { font-weight:600; }
 
   main { max-width:1040px; margin:0 auto; padding:16px 18px 72px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(158px,1fr)); gap:22px 14px; }
@@ -151,7 +167,8 @@
   const SITE_ORDER = ["시계거래소","바이버","번개장터","중고나라","캉카스","필웨이","타임포럼","구구스"];
   let all=[], site="전체", sort="new", kwActive=new Set(), settings={keywords:[],times:[],priceMin:0,priceMax:0,alertMaxAgeDays:0}, hasLocalApi=false;
   let viewMin=0, viewMax=0; // 화면 즉시 금액필터(만원). 설정과 별개, 저장 불필요.
-  const PRICE_PRESETS=[[0,0,"전체"],[0,2000,"~2천"],[2000,5000,"2~5천"],[5000,10000,"5천~1억"],[10000,0,"1억+"]];
+  const PMAX=10000; // 슬라이더 상한 1억(만원). 이 값이면 '제한없음'(그 이상 전부 포함).
+  const fmtMan = v => v>=10000 ? (v/10000).toLocaleString(undefined,{maximumFractionDigits:1})+"억" : v.toLocaleString()+"만";
   const cardHtml = (i) => `
     <a class="card" href="${i.url}" target="_blank" rel="noopener">
       <div class="ph">
@@ -215,21 +232,30 @@
       const k=el.dataset.k; kwActive.has(k)?kwActive.delete(k):kwActive.add(k); buildFilters(); render();
     });
 
-    // 금액 즉시 필터(프리셋 칩 + 직접입력). 저장/재검색 없이 화면에서 바로.
-    const active=(lo,hi)=>viewMin===lo&&viewMax===hi;
+    // 금액 듀얼 슬라이더(드래그로 min/max). 재검색·저장 없이 즉시. PMAX=제한없음.
+    const lo0=Math.min(viewMin||0,PMAX), hi0=viewMax?Math.min(viewMax,PMAX):PMAX;
     document.getElementById("pricerow").innerHTML =
       `<span class="lbl">금액</span>` +
-      PRICE_PRESETS.map(([lo,hi,lbl])=>`<span class="chip pp${active(lo,hi)?' on':''}" data-lo="${lo}" data-hi="${hi}">${lbl}</span>`).join("") +
-      `<input id="vMin" class="pfin" type="number" inputmode="numeric" placeholder="최소" value="${viewMin||''}">` +
-      `<span class="lbl">~</span>` +
-      `<input id="vMax" class="pfin" type="number" inputmode="numeric" placeholder="최대" value="${viewMax||''}"><span class="lbl">만원</span>`;
-    document.querySelectorAll(".chip.pp").forEach(el=>el.onclick=()=>{
-      viewMin=+el.dataset.lo; viewMax=+el.dataset.hi; buildFilters(); render();
-    });
-    const vMin=document.getElementById("vMin"), vMax=document.getElementById("vMax");
-    const apply=()=>{ viewMin=Number(vMin.value)||0; viewMax=Number(vMax.value)||0;
-      document.querySelectorAll(".chip.pp").forEach(c=>c.classList.toggle("on",+c.dataset.lo===viewMin&&+c.dataset.hi===viewMax)); render(); };
-    vMin.oninput=apply; vMax.oninput=apply;
+      `<div class="range">
+         <div class="range-track"></div>
+         <div class="range-fill" id="rfill"></div>
+         <input type="range" id="rMin" min="0" max="${PMAX}" step="100" value="${lo0}">
+         <input type="range" id="rMax" min="0" max="${PMAX}" step="100" value="${hi0}">
+       </div>
+       <div class="rangeval" id="rval"></div>`;
+    const rMin=document.getElementById("rMin"), rMax=document.getElementById("rMax"),
+          rfill=document.getElementById("rfill"), rval=document.getElementById("rval");
+    const sync=(doRender)=>{
+      let lo=+rMin.value, hi=+rMax.value;
+      if(lo>hi-100){ if(document.activeElement===rMin) lo=Math.max(0,hi-100); else hi=Math.min(PMAX,lo+100); rMin.value=lo; rMax.value=hi; }
+      const pL=lo/PMAX*100, pH=hi/PMAX*100;
+      rfill.style.left=pL+"%"; rfill.style.right=(100-pH)+"%";
+      viewMin=lo; viewMax=(hi>=PMAX?0:hi);
+      rval.innerHTML=`<b>${lo?fmtMan(lo):"0"}</b> ~ <b>${hi>=PMAX?"제한없음":fmtMan(hi)}</b>`;
+      if(doRender) render();
+    };
+    rMin.oninput=()=>sync(true); rMax.oninput=()=>sync(true);
+    sync(false);
   }
 
   // ===== 편집 패널 =====
