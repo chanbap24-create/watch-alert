@@ -3,9 +3,9 @@ name: watch-check
 # 하루 3회(KST 09/15/21시 = UTC 0/6/12). 로그인 불필요 6곳만 클라우드에서 검색.
 on:
   schedule:
-    - cron: "0 0 * * *"
-    - cron: "0 6 * * *"
-    - cron: "0 12 * * *"
+    - cron: "10 0 * * *"
+    - cron: "10 6 * * *"
+    - cron: "10 12 * * *"
   workflow_dispatch: {}
 
 permissions:
