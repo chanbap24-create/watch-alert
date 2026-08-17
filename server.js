@@ -179,11 +179,14 @@ const server = createServer(async (req, res) => {
 // 검색 시각(KST)으로 GitHub Actions cron과 맥 launchd를 다시 생성.
 async function regenSchedules(dir, times) {
   if (!times.length) return;
-  // GitHub Actions cron (UTC = KST - 9)
+  // GitHub Actions cron (UTC = KST - 9). GitHub 스케줄은 누락이 잦아 시각마다 13분 뒤 백업을 하나 더 건다.
+  // (cancel-in-progress:false라 백업은 큐잉되고, 변경 없으면 no-op이라 무해)
   const crons = times
-    .map((t) => {
+    .flatMap((t) => {
       const [h, m] = t.split(":").map(Number);
-      return `    - cron: "${m} ${(h - 9 + 24) % 24} * * *"`;
+      const uh = (h - 9 + 24) % 24;
+      const line = (min) => `    - cron: "${min % 60} ${(uh + Math.floor(min / 60)) % 24} * * *"`;
+      return [line(m), line(m + 13)];
     })
     .join("\n");
   try {
