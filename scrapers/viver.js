@@ -16,15 +16,29 @@ function normalize(p) {
   };
 }
 
-export async function scrapeViver(keyword, { size = 40 } = {}) {
-  const url = `${API}?q=${encodeURIComponent(keyword)}&size=${size}&sort=createdAt,desc`;
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
-  if (!res.ok) {
-    console.warn(`[바이버] 검색 실패 HTTP ${res.status}`);
-    return [];
+// 판매중만 남긴다(상태값이 "판매중"/"판매 완료"/"결제 완료" 등). 완료·예약 제외.
+const ON_SALE = "판매중";
+
+export async function scrapeViver(keyword, { pages = 3, size = 100 } = {}) {
+  const out = [];
+  const seen = new Set();
+  for (let p = 0; p < pages; p++) {
+    const url = `${API}?q=${encodeURIComponent(keyword)}&size=${size}&page=${p}&sort=createdAt,desc`;
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
+    if (!res.ok) {
+      console.warn(`[바이버] 검색 실패 HTTP ${res.status}`);
+      break;
+    }
+    const json = await res.json();
+    const content = json?.content || [];
+    for (const item of content) {
+      if (item.status !== ON_SALE) continue; // 판매중만
+      const n = normalize(item);
+      if (seen.has(n.id)) continue;
+      seen.add(n.id);
+      out.push(n);
+    }
+    if (content.length < size) break; // 마지막 페이지
   }
-  const json = await res.json();
-  const content = json?.content || [];
-  // 판매완료 제외(새 매물 알림 목적)
-  return content.filter((p) => p.status !== "판매완료").map(normalize);
+  return out;
 }
