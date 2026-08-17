@@ -60,7 +60,8 @@ function normalize(item) {
     id: `wx-${item.id}`,
     title: (item.productName || item.model || "(제목없음)").trim(),
     price: Number(item.sellPrice) || null,
-    url: `https://pc.watchexchange.co.kr/personal-product-detail/${item.id}`,
+    // 로그인 없이 보이는 자체 상세페이지로 링크(공개 API 사용). 원본 앱/웹 링크는 그 안에 있음.
+    url: `https://chanbap24-create.github.io/watch-alert/wx.html?id=${item.id}`,
     image: item.mainImage?.filePath ? S3 + item.mainImage.filePath : undefined,
     date: item.createdAt || item.inBoundDate || undefined,
   };

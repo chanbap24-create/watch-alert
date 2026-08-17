@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>시계거래소 매물</title>
+<style>
+  :root{--bg:#fff;--fg:#111;--sub:#8a8a8a;--line:#ededed;--card:#fafafa;--up:#e5484d}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--fg);word-break:keep-all;
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+  .wrap{max-width:640px;margin:0 auto;padding:0 0 40px}
+  .gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;background:#000}
+  .gallery img{width:100%;flex:none;scroll-snap-align:center;object-fit:contain;max-height:70vh;background:#000}
+  .body{padding:16px}
+  h1{font-size:1.15rem;font-weight:700;line-height:1.4;margin:0 0 6px}
+  .price{font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;margin:4px 0 2px}
+  .meta{color:var(--sub);font-size:.82rem;margin-bottom:14px}
+  .meta b{color:var(--fg);font-weight:600}
+  .desc{white-space:pre-wrap;font-size:.9rem;line-height:1.7;background:var(--card);border-radius:12px;padding:14px;margin-top:8px}
+  .status{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;background:#111;color:#fff;margin-bottom:8px}
+  .cta{position:sticky;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-top:1px solid var(--line);
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));margin-top:16px}
+  .cta a{display:block;text-align:center;background:#111;color:#fff;text-decoration:none;padding:14px;border-radius:12px;font-weight:700;font-size:.95rem}
+  .loading,.err{padding:60px 20px;text-align:center;color:var(--sub)}
+  .dots{text-align:center;padding:8px;color:var(--sub);font-size:.75rem}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="loading">불러오는 중…</div></div>
+<script>
+  const S3="https://watchexchange.s3.ap-northeast-2.amazonaws.com";
+  const won=n=>n?(n>=10000?Math.round(n/10000).toLocaleString()+"만원":n.toLocaleString()+"원"):"가격문의";
+  const id=new URLSearchParams(location.search).get("id");
+  const app=document.getElementById("app");
+  if(!id){ app.innerHTML='<div class="err">매물 ID가 없습니다.</div>'; }
+  else fetch(`https://api.watchexchange.co.kr/api/v1/public/sell-info/${id}`)
+    .then(r=>r.json()).then(res=>{
+      const x=res.data||res;
+      if(!x || !x.id){ app.innerHTML='<div class="err">매물을 찾을 수 없습니다. (삭제되었거나 만료)</div>'; return; }
+      const imgs=[x.mainImage, ...(x.registeredImages||[])].filter(Boolean)
+        .map(i=>S3+(i.filePath||i)).filter((v,idx,arr)=>arr.indexOf(v)===idx);
+      const desc=(x.watchUserSellPost?.content||"").trim();
+      document.title = x.productName || "시계거래소 매물";
+      app.innerHTML = `
+        ${imgs.length?`<div class="gallery">${imgs.map(u=>`<img src="${u}" alt="" onerror="this.style.display='none'">`).join("")}</div>
+          ${imgs.length>1?`<div class="dots">← 좌우로 넘겨보기 (${imgs.length}장) →</div>`:""}`:""}
+        <div class="body">
+          ${x.saleStatus?`<span class="status">시계거래소 · 개인매물</span>`:""}
+          <h1>${x.productName||"(제목없음)"}</h1>
+          <div class="price">${won(x.sellPrice)}</div>
+          <div class="meta"><b>모델번호</b> ${x.modelNum||"-"}　·　조회 ${x.views||0}</div>
+          ${desc?`<div class="desc">${desc.replace(/</g,"&lt;")}</div>`:""}
+        </div>
+        <div class="cta"><a href="https://pc.watchexchange.co.kr/personal-product-detail/${x.id}" target="_blank" rel="noopener">시계거래소 앱/웹에서 열기 (로그인 필요)</a></div>`;
+    })
+    .catch(()=>{ app.innerHTML='<div class="err">불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>'; });
+</script>
+</body>
+</html>
