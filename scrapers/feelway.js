@@ -1,7 +1,14 @@
 // 필웨이: 공개 JSON API로 검색(로그인·브라우저 불필요). 검색어 파라미터는 q.
 // 패션 위주 사이트라 시계 매물은 상대적으로 적음. 키워드 토큰으로 정밀 필터.
 const API = "https://www.feelway.com/api/search";
-const IMG_BASE = "https://www.feelway.com/";
+
+// 이미지 경로 "upfile005/upfile012/GOODS/.../x.jpg" → "https://img005.feelway.com/upfile012/GOODS/.../x.jpg"
+// (첫 세그먼트 upfileNNN 이 imgNNN 서브도메인). 비-upfile 형식은 원본에서도 삭제됨 → 미표시.
+function imageUrl(p) {
+  const path = p.g_photo || p.g_photo1 || "";
+  const m = path.match(/^upfile(\d+)\/(.+)$/);
+  return m ? `https://img${m[1]}.feelway.com/${m[2]}` : undefined;
+}
 
 function tokenMatch(text, keyword) {
   const t = text.toLowerCase();
@@ -19,7 +26,7 @@ function normalize(p) {
     title: (p.g_name || "(제목없음)").trim(),
     price: Number(p.g_price) || null,
     url: `https://www.feelway.com/gv_${brand.replace(/\s+/g, "%20")}_${p.g_no}.html`,
-    image: p.g_photo1 ? IMG_BASE + p.g_photo1 : p.g_photo ? IMG_BASE + p.g_photo : undefined,
+    image: imageUrl(p),
     date: p.created_at || undefined,
   };
 }
