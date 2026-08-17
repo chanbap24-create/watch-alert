@@ -39,8 +39,18 @@ const BRAND_ALIAS = {
 
 // 서버 searchKeyword가 이미 걸러주지만, 안전망으로 토큰이 모두(원문 또는 영문별칭) 있는지 확인.
 function matches(item, keyword) {
+  // 원본 카페 제목(watchUserSellPost.title)엔 브랜드가 살아있음(앱 productName은 "마린"처럼 생략).
   const w = item.watchSpecificationInfo || {};
-  const text = [item.productName, item.model, item.modelNum, w.brandCategory?.name, w.family, w.name, w.langNames?.en]
+  const text = [
+    item.productName,
+    item.model,
+    item.modelNum,
+    item.watchUserSellPost?.title,
+    w.brandCategory?.name,
+    w.family,
+    w.name,
+    w.langNames?.en,
+  ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -58,7 +68,8 @@ function normalize(item) {
   return {
     site: "시계거래소",
     id: `wx-${item.id}`,
-    title: (item.productName || item.model || "(제목없음)").trim(),
+    // 원본 카페 제목이 더 상세(브랜드 포함). 없으면 productName으로.
+    title: (item.watchUserSellPost?.title || item.productName || item.model || "(제목없음)").trim(),
     price: Number(item.sellPrice) || null,
     // 로그인 없이 보이는 자체 상세페이지로 링크(공개 API 사용). 원본 앱/웹 링크는 그 안에 있음.
     url: `https://chanbap24-create.github.io/watch-alert/wx.html?id=${item.id}`,
@@ -127,9 +138,22 @@ export async function scrapeWatchexchange(keywords, { pages = 2, size = 100 } = 
   const seen = new Set();
   const out = [];
   for (const kw of keywords) {
-    const raw = await searchKeyword(headers, kw, pages, size);
-    for (const item of raw) {
-      if (!matches(item, kw)) continue;
+    // 앱은 제목을 브랜드 없이("마린") 저장하는 경우가 많아, 전체 문구로 검색하면 최근 매물을 놓친다.
+    // → 키워드의 각 토큰(+브랜드 영문 별칭)으로 따로 검색해 합친 뒤, 구조화 정보로 정밀 필터.
+    const tokens = kw.split(/\s+/).filter((t) => t.length >= 1);
+    const terms = new Set();
+    for (const t of tokens) {
+      terms.add(t);
+      const alias = BRAND_ALIAS[t] || BRAND_ALIAS[t.toLowerCase()];
+      if (alias) terms.add(alias); // 예: 브레게 → breguet 로도 검색
+    }
+    const rawById = new Map();
+    for (const term of terms) {
+      const raw = await searchKeyword(headers, term, pages, size);
+      for (const item of raw) rawById.set(item.id, item);
+    }
+    for (const item of rawById.values()) {
+      if (!matches(item, kw)) continue; // 모든 토큰이 제목/모델/브랜드(별칭)/패밀리에 있어야
       const n = normalize(item);
       if (seen.has(n.id)) continue;
       seen.add(n.id);
