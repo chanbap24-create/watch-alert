@@ -4,7 +4,9 @@ name: watch-check
 on:
   schedule:
     - cron: "10 0 * * *"
+    - cron: "10 3 * * *"
     - cron: "10 6 * * *"
+    - cron: "10 9 * * *"
     - cron: "10 12 * * *"
   workflow_dispatch: {}
 
