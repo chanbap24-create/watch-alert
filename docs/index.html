@@ -259,7 +259,6 @@
       `🔍 <b>검색어</b> ${(d.keywords||[]).join(", ")||"-"}<br>` +
       `💰 <b>금액</b> ${pr}　⏰ <b>검색 시각</b> ${(d.times||[]).join(" · ")||"-"}<br>` +
       `🌐 <b>체크한 사이트</b> ${(d.sites||[]).join(" · ")||"-"}`;
-    if (!canEdit) settings.priceMin=d.priceMin||0, settings.priceMax=d.priceMax||0;
     buildFilters(); render();
   }
   boot();
