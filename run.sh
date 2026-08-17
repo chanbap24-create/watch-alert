@@ -8,10 +8,10 @@ CONFIG=config.local.json SEEN_FILE=seen.login.json SNAPSHOT_FILE=snapshot.local.
   /opt/homebrew/bin/node index.js >> data/run.log 2>&1
 echo "----- 종료 (exit $?) -----" >> data/run.log
 
-# 로컬 스냅샷을 GitHub에 push(폰 대시보드에 시계거래소·타임포럼 반영). 다른 파일이라 충돌 없음.
+# 로컬 스냅샷을 GitHub에 push(폰 대시보드에 시계거래소 반영). 먼저 커밋→pull→push 순.
 if git remote get-url origin >/dev/null 2>&1; then
-  git pull --rebase -X ours >> data/run.log 2>&1
   git add docs/snapshot.local.json >> data/run.log 2>&1
-  git commit -m "chore: local snapshot $(date '+%Y-%m-%d %H:%M')" >> data/run.log 2>&1 && \
+  git commit -m "chore: local snapshot $(date '+%Y-%m-%d %H:%M')" >> data/run.log 2>&1
+  git pull --rebase -X ours >> data/run.log 2>&1
   git push >> data/run.log 2>&1
 fi

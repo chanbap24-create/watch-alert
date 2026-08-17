@@ -9,5 +9,6 @@
     "21:00"
   ],
   "priceMin": 1000,
-  "priceMax": 2900
+  "priceMax": 2900,
+  "alertMaxAgeDays": 3
 }

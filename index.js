@@ -17,7 +17,7 @@ import { scrapeKangkas } from "./scrapers/kangkas.js";
 import { scrapeFeelway } from "./scrapers/feelway.js";
 import { scrapeTimeforum } from "./scrapers/timeforum.js";
 import { scrapeGugus } from "./scrapers/gugus.js";
-import { isFresh } from "./lib/freshness.js";
+import { isFresh, ageDays } from "./lib/freshness.js";
 
 // CONFIG 환경변수로 설정파일 선택(클라우드=config.cloud.json / 맥=config.local.json)
 const config = JSON.parse(await readFile(new URL(`./${process.env.CONFIG || "config.json"}`, import.meta.url), "utf8"));
@@ -116,6 +116,14 @@ async function main() {
   const minW = (settings.priceMin || 0) * 10000;
   const maxW = (settings.priceMax || 0) * 10000;
   const inPriceRange = (p) => p == null || (p >= minW && (maxW === 0 || p <= maxW));
+  // 알림은 "등록일이 최근"일 때만(며칠 전 옛 매물이 신규로 뒤늦게 잡혀도 알림 안 감).
+  // 날짜 불명 사이트는 통과. 0이면 이 조건 끔.
+  const alertAge = settings.alertMaxAgeDays || 0;
+  const isRecent = (item) => {
+    if (!alertAge) return true;
+    const a = ageDays(item.date);
+    return a == null || a <= alertAge;
+  };
 
   let newCount = 0;
   for (const item of found) {
@@ -124,8 +132,8 @@ async function main() {
     if (seen.has(item.id)) continue;
     seen.add(item.id);
     newCount++;
-    // 예산 범위 안(또는 가격문의)일 때만 알림
-    if (!firstRun && inPriceRange(item.price)) await notify(item);
+    // 신규 + 예산 범위 + 최근 등록일일 때만 알림
+    if (!firstRun && inPriceRange(item.price) && isRecent(item)) await notify(item);
   }
   await saveSeen(seen);
 
