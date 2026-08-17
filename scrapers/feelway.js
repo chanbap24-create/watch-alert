@@ -2,12 +2,17 @@
 // 패션 위주 사이트라 시계 매물은 상대적으로 적음. 키워드 토큰으로 정밀 필터.
 const API = "https://www.feelway.com/api/search";
 
-// 이미지 경로 "upfile005/upfile012/GOODS/.../x.jpg" → "https://img005.feelway.com/upfile012/GOODS/.../x.jpg"
-// (첫 세그먼트 upfileNNN 이 imgNNN 서브도메인). 비-upfile 형식은 원본에서도 삭제됨 → 미표시.
+// 필웨이 이미지 경로는 두 가지 저장소를 쓴다.
+//  1) "upfile005/GOODS/.../x.jpg" → "https://img005.feelway.com/GOODS/.../x.jpg" (첫 세그먼트 upfileNNN이 imgNNN 서브도메인)
+//  2) "9506092719/smallg23-....jpg"(스토어 위탁, 디렉터리 있음) → CloudFront goods_s3 버킷 그대로
+// 디렉터리 없는 단일 파일명(레거시)은 원본 부재라 미표시.
+const GOODS_CDN = "https://d1clt9cvsv6atu.cloudfront.net/goods_s3";
 function imageUrl(p) {
   const path = p.g_photo || p.g_photo1 || "";
   const m = path.match(/^upfile(\d+)\/(.+)$/);
-  return m ? `https://img${m[1]}.feelway.com/${m[2]}` : undefined;
+  if (m) return `https://img${m[1]}.feelway.com/${m[2]}`;
+  if (path.includes("/")) return `${GOODS_CDN}/${path}`;
+  return undefined;
 }
 
 function tokenMatch(text, keyword) {
