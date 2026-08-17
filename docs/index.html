@@ -28,6 +28,7 @@
   .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
   .chip.kw.on { background:#1e6fd9; border-color:#1e6fd9; }
   select { flex:none; font-size:.8rem; border:1px solid var(--line); border-radius:8px; padding:5px 8px; background:#fff; }
+  .pfin { flex:none; width:64px; font-size:16px; border:1px solid var(--line); border-radius:8px; padding:5px 7px; }
   main { max-width:1000px; margin:0 auto; padding:12px 16px 60px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px 12px; }
   .card { display:flex; flex-direction:column; text-decoration:none; color:inherit; }
@@ -75,6 +76,7 @@
     <div class="info" id="info"></div>
     <div class="row" id="kwrow"></div>
     <div class="row" id="siterow"></div>
+    <div class="row" id="pricerow"></div>
     <div class="panel" id="panel">
       <h3>검색어 (여러 개 추가 가능 · 저장 시 클라우드에도 반영)</h3>
       <div class="edit-list" id="kwEdit"></div>
@@ -108,6 +110,8 @@
 <script>
   const SITE_ORDER = ["시계거래소","바이버","번개장터","중고나라","캉카스","필웨이","타임포럼","구구스"];
   let all=[], site="전체", sort="new", kwActive=new Set(), settings={keywords:[],times:[],priceMin:0,priceMax:0,alertMaxAgeDays:0}, hasLocalApi=false;
+  let viewMin=0, viewMax=0; // 화면 즉시 금액필터(만원). 설정과 별개, 저장 불필요.
+  const PRICE_PRESETS=[[0,0,"전체"],[0,2000,"~2천"],[2000,5000,"2~5천"],[5000,10000,"5천~1억"],[10000,0,"1억+"]];
   const cardHtml = (i) => `
     <a class="card" href="${i.url}" target="_blank" rel="noopener">
       <div class="ph">
@@ -130,8 +134,8 @@
     // 가격문의(가격 없음)는 따로 분리
     let priced = list.filter(i=>i.price);
     const asks = list.filter(i=>!i.price);
-    // 금액 범위 필터(만원 → 원). max=0 이면 상한 없음
-    const min=(settings.priceMin||0)*10000, max=(settings.priceMax||0)*10000;
+    // 금액 즉시필터(만원 → 원). max=0 이면 상한 없음. 재검색 없이 화면에서 바로 거름.
+    const min=(viewMin||0)*10000, max=(viewMax||0)*10000;
     if (min>0 || max>0) priced = priced.filter(i=>i.price>=min && (max===0 || i.price<=max));
 
     const sortFn = (arr)=>{
@@ -170,6 +174,22 @@
     document.querySelectorAll(".chip.kw").forEach(el=>el.onclick=()=>{
       const k=el.dataset.k; kwActive.has(k)?kwActive.delete(k):kwActive.add(k); buildFilters(); render();
     });
+
+    // 금액 즉시 필터(프리셋 칩 + 직접입력). 저장/재검색 없이 화면에서 바로.
+    const active=(lo,hi)=>viewMin===lo&&viewMax===hi;
+    document.getElementById("pricerow").innerHTML =
+      `<span class="lbl">금액</span>` +
+      PRICE_PRESETS.map(([lo,hi,lbl])=>`<span class="chip pp${active(lo,hi)?' on':''}" data-lo="${lo}" data-hi="${hi}">${lbl}</span>`).join("") +
+      `<input id="vMin" class="pfin" type="number" inputmode="numeric" placeholder="최소" value="${viewMin||''}">` +
+      `<span class="lbl">~</span>` +
+      `<input id="vMax" class="pfin" type="number" inputmode="numeric" placeholder="최대" value="${viewMax||''}"><span class="lbl">만원</span>`;
+    document.querySelectorAll(".chip.pp").forEach(el=>el.onclick=()=>{
+      viewMin=+el.dataset.lo; viewMax=+el.dataset.hi; buildFilters(); render();
+    });
+    const vMin=document.getElementById("vMin"), vMax=document.getElementById("vMax");
+    const apply=()=>{ viewMin=Number(vMin.value)||0; viewMax=Number(vMax.value)||0;
+      document.querySelectorAll(".chip.pp").forEach(c=>c.classList.toggle("on",+c.dataset.lo===viewMin&&+c.dataset.hi===viewMax)); render(); };
+    vMin.oninput=apply; vMax.oninput=apply;
   }
 
   // ===== 편집 패널 =====
@@ -242,6 +262,8 @@
       updatedAt: new Date(Math.max(cU,lU)||Date.now()).toISOString(),
     };
     all=d.items||[];
+    // 화면 금액필터 초기값 = 설정값(있으면). 이후 화면에서 즉시 조절 가능(저장 불필요).
+    viewMin=d.priceMin||0; viewMax=d.priceMax||0;
     if(!hasLocalApi){
       // 폰: 저장소의 실제 settings.json을 읽어 정확한 현재값 확보(편집용)
       settings = await fetch("https://raw.githubusercontent.com/"+REPO+"/main/settings.json"+bust)
