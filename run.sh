@@ -12,6 +12,7 @@ echo "----- 종료 (exit $?) -----" >> data/run.log
 if git remote get-url origin >/dev/null 2>&1; then
   git add docs/snapshot.local.json >> data/run.log 2>&1
   git commit -m "chore: local snapshot $(date '+%Y-%m-%d %H:%M')" >> data/run.log 2>&1
-  git pull --rebase -X ours >> data/run.log 2>&1
+  # --autostash: 추적 파일에 딴 변경이 있어도 rebase가 안 막히게(과거 push 실패 원인)
+  git pull --rebase --autostash -X ours >> data/run.log 2>&1
   git push >> data/run.log 2>&1
 fi
