@@ -15,6 +15,7 @@ import { scrapeBunjang } from "./scrapers/bunjang.js";
 import { scrapeViver } from "./scrapers/viver.js";
 import { scrapeKangkas } from "./scrapers/kangkas.js";
 import { scrapeFeelway } from "./scrapers/feelway.js";
+import { scrapeWatchkor } from "./scrapers/watchkor.js";
 import { scrapeTimeforum } from "./scrapers/timeforum.js";
 import { scrapeGugus } from "./scrapers/gugus.js";
 import { scrapeHisigan } from "./scrapers/hisigan.js";
@@ -80,6 +81,12 @@ async function main() {
       console.log(`[필웨이] '${keyword}': ${items.length}건`);
       found.push(...items.map((i) => ((i.keyword = keyword), i)));
     }
+    // 워치코리아: 공개 API 직접 검색(브라우저 불필요)
+    if (config.sites.watchkor?.enabled) {
+      const items = await scrapeWatchkor(keyword);
+      console.log(`[워치코리아] '${keyword}': ${items.length}건`);
+      found.push(...items.map((i) => ((i.keyword = keyword), i)));
+    }
   }
   await browser.close();
 
@@ -112,7 +119,7 @@ async function main() {
 
   // 오래된(사실상 죽은) 매물 제거 — maxAgeDays 이내만. 날짜 불명 사이트는 유지.
   // 단, 상태값(판매중)이 정확한 마켓(바이버)은 오래돼도 판매중이면 유효 → 나이 필터 제외.
-  const AGELESS_SITES = new Set(["바이버", "시계거래소"]);
+  const AGELESS_SITES = new Set(["바이버", "시계거래소", "워치코리아"]);
   const before = found.length;
   const fresh = found.filter((i) => AGELESS_SITES.has(i.site) || isFresh(i, config.maxAgeDays));
   if (config.maxAgeDays) console.log(`최근 ${config.maxAgeDays}일 필터: ${before} → ${fresh.length}건`);
@@ -158,6 +165,7 @@ async function main() {
     const SITE_LABEL = {
       joongna: "중고나라", bunjang: "번개장터", viver: "바이버", kangkas: "캉카스",
       feelway: "필웨이", gugus: "구구스", watchexchange: "시계거래소", timeforum: "타임포럼",
+      hisigan: "하이시간", watchkor: "워치코리아",
     };
     const checkedSites = Object.entries(config.sites)
       .filter(([, v]) => v?.enabled)

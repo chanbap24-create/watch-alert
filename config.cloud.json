@@ -30,6 +30,9 @@
     },
     "hisigan": {
       "enabled": true
+    },
+    "watchkor": {
+      "enabled": true
     }
   }
 }
