@@ -1,6 +1,6 @@
 {
   "keywords": [
-    "브레게"
+    "오버시즈"
   ],
   "times": [
     "09:11",
@@ -9,7 +9,7 @@
     "18:11",
     "21:11"
   ],
-  "priceMin": 1000,
-  "priceMax": 12900,
+  "priceMin": 2000,
+  "priceMax": 5000,
   "alertMaxAgeDays": 3
 }
