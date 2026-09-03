@@ -57,6 +57,12 @@
     -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .row::-webkit-scrollbar { display:none; }
   .row .lbl { flex:none; font-size:.6rem; color:var(--sub); letter-spacing:.1em; text-transform:uppercase; padding-right:2px; }
+  /* 결과내 필터 배지 */
+  .tfbadge { margin-top:10px; font-size:.8rem; color:var(--ink); display:inline-flex; align-items:center;
+    gap:7px; background:color-mix(in srgb,var(--blue) 8%,transparent); border:1px solid color-mix(in srgb,var(--blue) 22%,transparent);
+    border-radius:8px; padding:6px 11px; width:fit-content; }
+  .tfbadge b { color:var(--blue); font-weight:600; }
+  .tfbadge .x { color:var(--sub); cursor:pointer; font-size:.74rem; }
   /* 조사 상태줄: 점(초록/빨강) + 사이트명 */
   .statusrow { display:flex; flex-wrap:wrap; gap:5px 12px; align-items:center; margin-top:9px; }
   .statusrow .lbl { flex:none; font-size:.6rem; color:var(--sub); letter-spacing:.1em; text-transform:uppercase; }
@@ -166,6 +172,8 @@
         <button class="gear" id="gear" style="display:none" onclick="togglePanel()">편집</button>
       </div>
     </div>
+    <!-- 결과내 필터 배지(오버시즈 등) -->
+    <div class="tfbadge" id="tfbadge" style="display:none"></div>
     <!-- 조사 상태: 사이트별 초록(성공)/빨강(실패) 상시 표기 -->
     <div class="statusrow" id="statusrow"></div>
     <!-- 사이트 필터: 항상 노출(주 탐색 수단) -->
@@ -193,6 +201,8 @@
         <input id="kwInput" placeholder="검색어 추가 (예: 롤렉스 서브마리너)">
         <button onclick="addKw()">추가</button>
       </div>
+      <h3>결과내 필터 (넓게 검색 후 이 단어로 좁힘 · 예: 오버시즈 · 비우면 전체)</h3>
+      <div class="addbar"><input id="rfInput" placeholder="결과내 필터 (예: 오버시즈)" style="flex:1"></div>
       <h3>금액 범위 (만원 · 0 = 제한 없음)</h3>
       <div class="price-inputs">
         <input type="number" id="pMin" placeholder="최소" min="0"><span>만원 ~</span>
@@ -221,6 +231,7 @@
   let all=[], site="전체", sort="new", kwActive=new Set(), settings={keywords:[],times:[],priceMin:0,priceMax:0,alertMaxAgeDays:0}, hasLocalApi=false;
   let snapAll=[], liveResults=null; // 모아둔 스냅샷 백업 / 실시간 검색 결과
   let viewMin=0, viewMax=0; // 화면 즉시 금액필터(만원). 설정과 별개, 저장 불필요.
+  let textFilter=""; // 결과내 필터(제목 텍스트). resultFilter(오버시즈 등)로 초기화.
   const PMAX=10000; // 슬라이더 상한 1억(만원). 이 값이면 '제한없음'(그 이상 전부 포함).
   const fmtMan = v => v>=10000 ? (v/10000).toLocaleString(undefined,{maximumFractionDigits:1})+"억" : v.toLocaleString()+"만";
   const cardHtml = (i) => `
@@ -242,6 +253,9 @@
   function render() {
     let list = site==="전체" ? all : all.filter(i=>i.site===site);
     if (kwActive.size) list = list.filter(i => kwActive.has(i.keyword));
+    // 결과내 필터(오버시즈 등): 제목에 모든 토큰 포함
+    if (textFilter) { const toks=textFilter.toLowerCase().split(/\s+/).filter(Boolean);
+      list = list.filter(i => toks.every(t => (i.title||"").toLowerCase().includes(t))); }
     // 가격문의(가격 없음)는 따로 분리
     let priced = list.filter(i=>i.price);
     const asks = list.filter(i=>!i.price);
@@ -378,6 +392,8 @@
       `<span class="edit-chip">${k}<button onclick="delKw(${idx})">×</button></span>`).join("") || '<span class="savenote">검색어가 없습니다</span>';
     document.getElementById("timesEdit").innerHTML = (settings.times||[]).map((t,idx)=>
       `<input type="time" value="${t}" onchange="settings.times[${idx}]=this.value">`).join("");
+    const rf=document.getElementById("rfInput"); rf.value=settings.resultFilter||"";
+    rf.onchange=e=>settings.resultFilter=e.target.value.trim();
     document.getElementById("pMin").value = settings.priceMin||"";
     document.getElementById("pMax").value = settings.priceMax||"";
     document.getElementById("pMin").onchange = e=>settings.priceMin=Number(e.target.value)||0;
@@ -413,7 +429,7 @@
     try{
       const url=`https://api.github.com/repos/${REPO}/contents/settings.json`;
       const cur=await fetch(url,{headers:{Authorization:"token "+pat}}).then(r=>r.json());
-      const body={keywords:settings.keywords,times:settings.times,priceMin:settings.priceMin||0,priceMax:settings.priceMax||0,alertMaxAgeDays:settings.alertMaxAgeDays||0};
+      const body={keywords:settings.keywords,resultFilter:settings.resultFilter||"",times:settings.times,priceMin:settings.priceMin||0,priceMax:settings.priceMax||0,alertMaxAgeDays:settings.alertMaxAgeDays||0};
       const content=btoa(unescape(encodeURIComponent(JSON.stringify(body,null,2)+"\n")));
       const r=await fetch(url,{method:"PUT",headers:{Authorization:"token "+pat,"Content-Type":"application/json"},
         body:JSON.stringify({message:"chore: 설정 편집(폰)",content,sha:cur.sha})});
@@ -421,6 +437,15 @@
       else{ const e=await r.json(); note.textContent="저장 실패: "+(e.message||r.status)+(r.status===401?" (토큰 확인)":""); if(r.status===401)localStorage.removeItem("gh_pat"); }
     }catch(e){ note.textContent="저장 실패: "+e.message; }
   }
+
+  // 결과내 필터 배지(오버시즈 등). 넓게 검색 후 이 텍스트로 좁혀 봄. ✕로 전체보기.
+  function showTextFilter(){
+    const el=document.getElementById("tfbadge");
+    if(!textFilter){ el.style.display="none"; el.innerHTML=""; return; }
+    el.style.display="";
+    el.innerHTML=`결과내 <b>${textFilter}</b> <span class="x" onclick="clearTextFilter()">✕ 전체</span>`;
+  }
+  function clearTextFilter(){ textFilter=""; showTextFilter(); buildFilters(); render(); }
 
   // 조사 상태줄: 사이트별 초록(성공)/빨강(실패·재로그인 필요) + 건수
   function renderStatus(d){
@@ -480,6 +505,9 @@
       row("검색시각", (d.times||[]).join(" · ")) +
       row("사이트", (d.sites||[]).join(" · "));
     renderStatus(d);
+    // 결과내 필터(오버시즈 등) 초기값: 스냅샷 메타 우선, 없으면 설정값
+    textFilter = (d.resultFilter || settings.resultFilter || "").trim();
+    showTextFilter();
     buildFilters(); render(); renderSaved();
   }
   boot();

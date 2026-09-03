@@ -71,7 +71,8 @@ const server = createServer(async (req, res) => {
         const priceMin = Math.max(0, Number(body.priceMin) || 0);
         const priceMax = Math.max(0, Number(body.priceMax) || 0);
         const alertMaxAgeDays = Math.max(0, Number(body.alertMaxAgeDays) || 0);
-        await writeFile(dir + "settings.json", JSON.stringify({ keywords, times, priceMin, priceMax, alertMaxAgeDays }, null, 2));
+        const resultFilter = String(body.resultFilter || "").trim();
+        await writeFile(dir + "settings.json", JSON.stringify({ keywords, resultFilter, times, priceMin, priceMax, alertMaxAgeDays }, null, 2));
         // 모든 config의 keywords 동기화
         for (const f of ["config.json", "config.cloud.json", "config.local.json"]) {
           try {

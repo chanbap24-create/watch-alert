@@ -114,6 +114,10 @@ async function main() {
     const a = ageDays(item.date);
     return a == null || a <= alertAge;
   };
+  // 결과내 필터: 넓게 검색(브랜드)하고 특정 모델만 알림/표시. 제목에 모든 토큰 포함.
+  const resultFilter = (settings.resultFilter || "").trim();
+  const matchesFilter = (item) =>
+    !resultFilter || resultFilter.split(/\s+/).every((t) => (item.title || "").toLowerCase().includes(t.toLowerCase()));
 
   let newCount = 0;
   for (const item of found) {
@@ -124,8 +128,8 @@ async function main() {
       seen.add(item.id);
       newCount++;
     }
-    // 알림 = NEW(신규+최근) + 예산 범위
-    if (item.isNew && inPriceRange(item.price)) await notify(item);
+    // 알림 = NEW(신규+최근) + 예산 범위 + 결과내 필터(오버시즈 등)
+    if (item.isNew && inPriceRange(item.price) && matchesFilter(item)) await notify(item);
   }
   await saveSeen(seen);
 
@@ -154,6 +158,7 @@ async function main() {
       JSON.stringify({
         updatedAt: new Date().toISOString(),
         keywords,
+        resultFilter,
         times: settings.times,
         sites: checkedSites,
         siteStatus,

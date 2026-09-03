@@ -1,6 +1,6 @@
 {
   "keywords": [
-    "오버시즈"
+    "바쉐론 콘스탄틴"
   ],
   "times": [
     "09:11",
@@ -11,5 +11,6 @@
   ],
   "priceMin": 2000,
   "priceMax": 5000,
-  "alertMaxAgeDays": 3
+  "alertMaxAgeDays": 3,
+  "resultFilter": "오버시즈"
 }
