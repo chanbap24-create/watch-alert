@@ -119,13 +119,12 @@ async function searchKeyword(headers, keyword, pages, size) {
 // pages: 키워드당 훑을 최신 페이지 수(신규순 → 새 매물은 앞쪽). 알림 목적이라 소수로 충분.
 export async function scrapeWatchexchange(keywords, { pages = 2, size = 100 } = {}) {
   if (!existsSync(PROFILE)) {
-    console.warn("[시계거래소] 로그인 필요 — `npm run login:watchexchange` 먼저 실행");
-    return [];
+    throw new Error("로그인 프로필 없음 — `npm run login:watchexchange` 필요");
   }
   const { at, dev } = await getAuth();
   if (!at || !dev) {
-    console.warn("[시계거래소] 토큰 없음 — 재로그인 필요");
-    return [];
+    // 토큰 만료 → 조사 실패로 명확히 표시(대시보드 빨강). 호출측 runSite가 잡음.
+    throw new Error("토큰 없음 — 재로그인 필요");
   }
   const headers = {
     Authorization: "Bearer " + at,

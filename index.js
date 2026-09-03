@@ -50,72 +50,45 @@ async function main() {
   });
 
   const found = [];
+  // 사이트별 조사 결과(성공/실패·건수). 한 사이트가 죽어도 나머지는 진행(개별 try/catch).
+  const siteStats = {}; // label -> { ok, count }
+  const rec = (label, ok, count = 0) => {
+    const s = siteStats[label] || (siteStats[label] = { ok: true, count: 0 });
+    if (!ok) s.ok = false;
+    s.count += count;
+  };
+  // enabled면 fn 실행 → 결과 배열 반환(실패 시 [] + 빨강 기록). 사이트 하나 죽어도 전체는 계속.
+  async function runSite(enabled, label, fn) {
+    if (!enabled) return [];
+    try {
+      const items = await fn();
+      rec(label, true, items.length);
+      console.log(`[${label}] ${items.length}건`);
+      return items;
+    } catch (e) {
+      rec(label, false);
+      console.warn(`[${label}] 실패: ${e.message}`);
+      return [];
+    }
+  }
+
   for (const keyword of keywords) {
-    // 중고나라: 브라우저로 검색 응답 가로채기
-    if (config.sites.joongna?.enabled) {
-      const items = await scrapeJoongna(context, keyword);
-      console.log(`[중고나라] '${keyword}': ${items.length}건`);
-      found.push(...items.map((i) => ((i.keyword = keyword), i)));
-    }
-    // 번개장터: 공개 API 직접 검색(브라우저 불필요)
-    if (config.sites.bunjang?.enabled) {
-      const items = await scrapeBunjang(keyword);
-      console.log(`[번개장터] '${keyword}': ${items.length}건`);
-      found.push(...items.map((i) => ((i.keyword = keyword), i)));
-    }
-    // 바이버: 공개 API 직접 검색(브라우저 불필요)
-    if (config.sites.viver?.enabled) {
-      const items = await scrapeViver(keyword);
-      console.log(`[바이버] '${keyword}': ${items.length}건`);
-      found.push(...items.map((i) => ((i.keyword = keyword), i)));
-    }
-    // 캉카스: 쇼핑몰 검색 HTML 파싱(브라우저 불필요)
-    if (config.sites.kangkas?.enabled) {
-      const items = await scrapeKangkas(keyword);
-      console.log(`[캉카스] '${keyword}': ${items.length}건`);
-      found.push(...items.map((i) => ((i.keyword = keyword), i)));
-    }
-    // 필웨이: 공개 API 직접 검색(브라우저 불필요)
-    if (config.sites.feelway?.enabled) {
-      const items = await scrapeFeelway(keyword);
-      console.log(`[필웨이] '${keyword}': ${items.length}건`);
-      found.push(...items.map((i) => ((i.keyword = keyword), i)));
-    }
-    // 워치코리아: 공개 API 직접 검색(브라우저 불필요)
-    if (config.sites.watchkor?.enabled) {
-      const items = await scrapeWatchkor(keyword);
-      console.log(`[워치코리아] '${keyword}': ${items.length}건`);
-      found.push(...items.map((i) => ((i.keyword = keyword), i)));
-    }
+    const tag = (items) => items.map((i) => ((i.keyword = keyword), i));
+    found.push(...tag(await runSite(config.sites.joongna?.enabled, "중고나라", () => scrapeJoongna(context, keyword))));
+    found.push(...tag(await runSite(config.sites.bunjang?.enabled, "번개장터", () => scrapeBunjang(keyword))));
+    found.push(...tag(await runSite(config.sites.viver?.enabled, "바이버", () => scrapeViver(keyword))));
+    found.push(...tag(await runSite(config.sites.kangkas?.enabled, "캉카스", () => scrapeKangkas(keyword))));
+    found.push(...tag(await runSite(config.sites.feelway?.enabled, "필웨이", () => scrapeFeelway(keyword))));
+    found.push(...tag(await runSite(config.sites.watchkor?.enabled, "워치코리아", () => scrapeWatchkor(keyword))));
   }
   await browser.close();
 
-  // 하이시간: 브랜드별 판매 API(쿠키 세션, 브라우저 불필요)
-  if (config.sites.hisigan?.enabled && keywords.length) {
-    const items = await scrapeHisigan(keywords);
-    console.log(`[하이시간] 매칭: ${items.length}건`);
-    found.push(...items.map(tagKeyword));
-  }
-
-  // 아래 3곳은 키워드 배열을 한 번에 받으므로, 결과를 제목 기준으로 키워드 태깅
-  // 시계거래소: 개인매물 목록을 받아 키워드로 필터(별도 로그인 프로필 사용)
-  if (config.sites.watchexchange?.enabled && keywords.length) {
-    const items = await scrapeWatchexchange(keywords);
-    console.log(`[시계거래소] 개인매물 매칭: ${items.length}건`);
-    found.push(...items.map(tagKeyword));
-  }
-  // 타임포럼: 로그인 프로필로 회원장터 검색
-  if (config.sites.timeforum?.enabled && keywords.length) {
-    const items = await scrapeTimeforum(keywords);
-    console.log(`[타임포럼] 매칭: ${items.length}건`);
-    found.push(...items.map(tagKeyword));
-  }
-  // 구구스: 브라우저로 브랜드 검색 → 시계 필터
-  if (config.sites.gugus?.enabled && keywords.length) {
-    const items = await scrapeGugus(keywords);
-    console.log(`[구구스] 매칭: ${items.length}건`);
-    found.push(...items.map(tagKeyword));
-  }
+  // 아래 4곳은 키워드 배열을 한 번에 받으므로, 결과를 제목 기준으로 키워드 태깅
+  const has = keywords.length > 0;
+  found.push(...(await runSite(config.sites.hisigan?.enabled && has, "하이시간", () => scrapeHisigan(keywords))).map(tagKeyword));
+  found.push(...(await runSite(config.sites.watchexchange?.enabled && has, "시계거래소", () => scrapeWatchexchange(keywords))).map(tagKeyword));
+  found.push(...(await runSite(config.sites.timeforum?.enabled && has, "타임포럼", () => scrapeTimeforum(keywords))).map(tagKeyword));
+  found.push(...(await runSite(config.sites.gugus?.enabled && has, "구구스", () => scrapeGugus(keywords))).map(tagKeyword));
 
   // 오래된(사실상 죽은) 매물 제거 — maxAgeDays 이내만. 날짜 불명 사이트는 유지.
   // 단, 상태값(판매중)이 정확한 마켓(바이버)은 오래돼도 판매중이면 유효 → 나이 필터 제외.
@@ -170,6 +143,12 @@ async function main() {
     const checkedSites = Object.entries(config.sites)
       .filter(([, v]) => v?.enabled)
       .map(([k]) => SITE_LABEL[k] || k);
+    // 사이트별 조사 상태(초록/빨강용): {site, ok, count}. enabled인데 기록 없으면 실패로 간주.
+    const siteStatus = checkedSites.map((label) => ({
+      site: label,
+      ok: siteStats[label]?.ok ?? false,
+      count: siteStats[label]?.count ?? 0,
+    }));
     await writeFile(
       outDir + snapFile,
       JSON.stringify({
@@ -177,6 +156,7 @@ async function main() {
         keywords,
         times: settings.times,
         sites: checkedSites,
+        siteStatus,
         priceMin: settings.priceMin || 0,
         priceMax: settings.priceMax || 0,
         alertMaxAgeDays: settings.alertMaxAgeDays || 0,

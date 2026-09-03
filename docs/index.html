@@ -57,6 +57,15 @@
     -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .row::-webkit-scrollbar { display:none; }
   .row .lbl { flex:none; font-size:.6rem; color:var(--sub); letter-spacing:.1em; text-transform:uppercase; padding-right:2px; }
+  /* 조사 상태줄: 점(초록/빨강) + 사이트명 */
+  .statusrow { display:flex; flex-wrap:wrap; gap:5px 12px; align-items:center; margin-top:9px; }
+  .statusrow .lbl { flex:none; font-size:.6rem; color:var(--sub); letter-spacing:.1em; text-transform:uppercase; }
+  .st { display:inline-flex; align-items:center; gap:5px; font-size:.74rem; color:var(--ink); white-space:nowrap; }
+  .st::before { content:''; width:7px; height:7px; border-radius:50%; flex:none; }
+  .st.ok::before { background:var(--ok, #1a9d4c); box-shadow:0 0 0 2px color-mix(in srgb, var(--ok, #1a9d4c) 20%, transparent); }
+  .st.bad { color:var(--bad, #d23b3b); font-weight:600; }
+  .st.bad::before { background:var(--bad, #d23b3b); box-shadow:0 0 0 2px color-mix(in srgb, var(--bad, #d23b3b) 22%, transparent); }
+  .st .cnt { color:var(--sub); font-variant-numeric:tabular-nums; }
   .chip { flex:none; border:1px solid var(--line); background:var(--paper); border-radius:8px;
     padding:6px 11px; font-size:.79rem; cursor:pointer; color:var(--sub); white-space:nowrap;
     font-family:inherit; transition:color .12s,border-color .12s; }
@@ -157,6 +166,8 @@
         <button class="gear" id="gear" style="display:none" onclick="togglePanel()">편집</button>
       </div>
     </div>
+    <!-- 조사 상태: 사이트별 초록(성공)/빨강(실패) 상시 표기 -->
+    <div class="statusrow" id="statusrow"></div>
     <!-- 사이트 필터: 항상 노출(주 탐색 수단) -->
     <div class="row" id="siterow"></div>
     <!-- 검색 서랍 -->
@@ -411,6 +422,20 @@
     }catch(e){ note.textContent="저장 실패: "+e.message; }
   }
 
+  // 조사 상태줄: 사이트별 초록(성공)/빨강(실패·재로그인 필요) + 건수
+  function renderStatus(d){
+    const el=document.getElementById("statusrow");
+    const list=d.siteStatus||[];
+    if(!list.length){ el.innerHTML=""; return; }
+    const bad=list.filter(s=>!s.ok).length;
+    const head=bad
+      ? `<span class="lbl" style="color:var(--bad,#d23b3b)">조사실패 ${bad}</span>`
+      : `<span class="lbl">전체 정상</span>`;
+    el.innerHTML=head+list.map(s=>
+      `<span class="st ${s.ok?'ok':'bad'}">${s.site}${s.ok?` <span class="cnt">${s.count}</span>`:' 실패'}</span>`
+    ).join("");
+  }
+
   async function boot(){
     // 편집 버튼은 항상 표시(폰=GitHub 직접저장 / 맥=로컬서버)
     document.getElementById("gear").style.display="";
@@ -427,8 +452,11 @@
       ...cloud,
       items: [...(cloud.items||[]), ...(local.items||[])],
       sites: [...(cloud.sites||[]), ...(local.sites||[])],
+      siteStatus: [...(cloud.siteStatus||[]), ...(local.siteStatus||[])],
       updatedAt: new Date(Math.max(cU,lU)||Date.now()).toISOString(),
     };
+    // 각 스냅샷의 갱신시각도 상태줄에 활용(오래되면 참고)
+    d._cloudAt=cU; d._localAt=lU;
     all=d.items||[]; snapAll=all;
     document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")liveSearch();});
     // 화면 금액필터 초기값 = 설정값(있으면). 이후 화면에서 즉시 조절 가능(저장 불필요).
@@ -451,6 +479,7 @@
       row("알림가", pr) +
       row("검색시각", (d.times||[]).join(" · ")) +
       row("사이트", (d.sites||[]).join(" · "));
+    renderStatus(d);
     buildFilters(); render(); renderSaved();
   }
   boot();
